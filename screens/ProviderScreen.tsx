@@ -9,7 +9,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { useState } from 'react';
-
 import {
   ActivityIndicator,
   Image,
@@ -21,6 +20,24 @@ import {
   View,
 } from 'react-native';
 
+interface Region {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  price: string | number;
+  [key: string]: any;
+}
+
+interface Booking {
+  id: string;
+  [key: string]: any;
+}
 
 export default function ProviderScreen() {
   const {
@@ -1101,7 +1118,7 @@ export default function ProviderScreen() {
                         longitude,
                       };
 
-                      setRegion(prev => ({
+                      setRegion((prev: Region) => ({
                         ...prev,
                         ...newCoords,
                       }));
@@ -1465,7 +1482,7 @@ export default function ProviderScreen() {
             </Text>
 
             {providerServices.map(
-              item => (
+             (item: Service) => (
                 <View
                   key={item.id}
                   style={
@@ -1648,7 +1665,7 @@ export default function ProviderScreen() {
                 </View>
               ) : (
                 providerUpcoming.map(
-                  b => (
+                 (b: Booking) => (
                     <View
                       key={b.id}
                       style={
@@ -1955,7 +1972,7 @@ export default function ProviderScreen() {
                   </View>
                 ) : (
                   providerHistory.map(
-                    b => (
+                    (b: Booking) => (
                       <View
                         key={b.id}
                         style={[

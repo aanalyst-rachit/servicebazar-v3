@@ -1,10 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApps, initializeApp } from 'firebase/app';
-import {
-  getReactNativePersistence,
-  initializeAuth,
-  type Auth,
-} from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -25,24 +20,21 @@ const app = getApps().length
 // Firestore
 export const db = getFirestore(app);
 
-// Firebase Auth — React Native persistent auth
-let auth: Auth;
+// Firebase Auth
+//
+// Keep getAuth(app) here because Firebase v12.18.0's default
+// TypeScript entrypoint does not expose getReactNativePersistence,
+// while Metro's React Native bundle does have RN-specific behavior.
+//
+// Most importantly, this keeps the existing anonymous-auth flow
+// used by AppContext intact.
+//
+// Explicit Auth type prevents the previous:
+//
+//   Variable 'auth' implicitly has type 'any'
+//
+// TypeScript error.
 
-try {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (error: any) {
-  // If Auth was already initialized by another module,
-  // retrieve the existing Auth instance.
-  if (error?.code === 'auth/already-initialized') {
-    const { getAuth } = require('firebase/auth');
-    auth = getAuth(app);
-  } else {
-    throw error;
-  }
-}
-
-export { auth };
+export const auth: Auth = getAuth(app);
 
 export default app;
