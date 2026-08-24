@@ -150,6 +150,16 @@ export function AppProvider({
     useState('customer');
 
   // ==========================================================
+  // GOOGLE NEW USER ONBOARDING
+  // ==========================================================
+
+  const [showGoogleOnboarding, setShowGoogleOnboarding] =
+    useState(false);
+
+  const [pendingGoogleUser, setPendingGoogleUser] =
+    useState(null);
+
+  // ==========================================================
   // LOCATION
   // ==========================================================
 
@@ -926,9 +936,7 @@ export function AppProvider({
   const handleGoogleSignIn =
     async () => {
       try {
-        console.log(
-          'Starting Google Sign-In...'
-        );
+        console.log('Starting Google Sign-In...');
 
         await GoogleSignin.hasPlayServices({
           showPlayServicesUpdateDialog: true,
@@ -950,10 +958,6 @@ export function AppProvider({
           );
         }
 
-        // ----------------------------------------------------
-        // Google -> Firebase Credential
-        // ----------------------------------------------------
-
         const credential =
           GoogleAuthProvider.credential(
             idToken
@@ -974,7 +978,7 @@ export function AppProvider({
         const googleName =
           firebaseUser.displayName?.trim() ||
           firebaseUser.email?.split('@')[0] ||
-          'Customer';
+          '';
 
         const googleEmail =
           firebaseUser.email || '';
@@ -986,119 +990,158 @@ export function AppProvider({
           firebaseUser.phoneNumber?.trim() || '';
 
         // ----------------------------------------------------
-        // Google account me normally phone number nahi hota.
-        // Isliye email ko account key banaya ja raha hai
-        // jab phone available nahi ho.
+        // NEW MASTER PROFILE: users/{uid}
         // ----------------------------------------------------
 
-        const accountKey =
-          googlePhone || googleEmail;
+        const uidRef =
+          doc(db, 'users', uid);
 
-        if (!accountKey) {
-          throw new Error(
-            'Google account se email information nahi mili.'
+        const uidSnap =
+          await getDoc(uidRef);
+
+        if (uidSnap.exists()) {
+          const existing =
+            uidSnap.data();
+
+          const role =
+            existing.role || 'customer';
+
+          const sessionData = {
+            ...existing,
+            uid,
+            email: existing.email || googleEmail,
+            role,
+            authProvider:
+              existing.authProvider || 'google',
+          };
+
+          await AsyncStorage.setItem(
+            STORAGE_KEYS.USER_SESSION,
+            JSON.stringify(sessionData)
           );
+
+          setUserRole(role);
+          setAuthName(
+            existing.name || googleName
+          );
+          setAuthPhone(
+            existing.phone || googlePhone
+          );
+          setOwnerName(
+            existing.name || googleName
+          );
+          setMobileNumber(
+            existing.phone || googlePhone
+          );
+
+          if (existing.profileUri) {
+            setCustomerProfileUri(
+              existing.profileUri
+            );
+          }
+
+          return;
         }
 
         // ----------------------------------------------------
-        // USERS COLLECTION
+        // BACKWARD COMPATIBILITY
+        // Existing Google users were previously stored as
+        // users/{email}. Reuse that data and migrate it to
+        // users/{uid}.
         // ----------------------------------------------------
 
-        await setDoc(
-          doc(
-            db,
-            'users',
-            accountKey
-          ),
-          {
-            name: googleName,
-            phone: googlePhone,
-            email: googleEmail,
-            role: 'customer',
-            uid: uid,
-            profileUri: googlePhoto,
-            isPaid: false,
-            authProvider: 'google',
-            updatedAt: new Date(),
-          },
-          { merge: true }
-        );
+        if (googleEmail) {
+          const legacyRef =
+            doc(db, 'users', googleEmail);
 
-        // ----------------------------------------------------
-        // registered_phones
-        //
-        // Sirf actual phone available ho tab.
-        // ----------------------------------------------------
+          const legacySnap =
+            await getDoc(legacyRef);
 
-        if (googlePhone) {
-          await setDoc(
-            doc(
-              db,
-              'registered_phones',
-              googlePhone
-            ),
-            {
-              phone: googlePhone,
-              name: googleName,
-              role: 'customer',
-              uid: uid,
-              email: googleEmail,
+          if (legacySnap.exists()) {
+            const legacy =
+              legacySnap.data();
+
+            const migrated = {
+              ...legacy,
+              uid,
+              email:
+                legacy.email || googleEmail,
+              name:
+                legacy.name || googleName,
+              phone:
+                legacy.phone || googlePhone,
+              profileUri:
+                legacy.profileUri || googlePhoto,
+              role:
+                legacy.role || 'customer',
               authProvider: 'google',
               updatedAt: new Date(),
-            },
-            { merge: true }
-          );
+            };
+
+            await setDoc(
+              uidRef,
+              migrated,
+              { merge: true }
+            );
+
+            const sessionData = {
+              ...migrated,
+              uid,
+            };
+
+            await AsyncStorage.setItem(
+              STORAGE_KEYS.USER_SESSION,
+              JSON.stringify(sessionData)
+            );
+
+            setUserRole(
+              migrated.role
+            );
+
+            setAuthName(
+              migrated.name || ''
+            );
+
+            setAuthPhone(
+              migrated.phone || ''
+            );
+
+            setOwnerName(
+              migrated.name || ''
+            );
+
+            setMobileNumber(
+              migrated.phone || ''
+            );
+
+            if (migrated.profileUri) {
+              setCustomerProfileUri(
+                migrated.profileUri
+              );
+            }
+
+            return;
+          }
         }
 
         // ----------------------------------------------------
-        // LOCAL SESSION
+        // BRAND NEW GOOGLE USER
+        // Do NOT automatically make them a customer.
+        // Show onboarding form instead.
         // ----------------------------------------------------
 
-        const sessionData = {
-          role: 'customer',
+        setPendingGoogleUser({
+          uid,
+          email: googleEmail,
           name: googleName,
           phone: googlePhone,
-          email: googleEmail,
-          uid: uid,
           profileUri: googlePhoto,
-          authProvider: 'google',
-        };
+        });
 
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.USER_SESSION,
-          JSON.stringify(sessionData)
-        );
+        setAuthName(googleName);
+        setAuthPhone(googlePhone);
 
-        // ----------------------------------------------------
-        // UPDATE APP STATE
-        // ----------------------------------------------------
-
-        setUserRole('customer');
-
-        setAuthName(
-          googleName
-        );
-
-        setAuthPhone(
-          googlePhone
-        );
-
-        setOwnerName(
-          googleName
-        );
-
-        setMobileNumber(
-          googlePhone
-        );
-
-        setCustomerProfileUri(
-          googlePhoto
-        );
-
-        Alert.alert(
-          'Success 🎉',
-          `Google se login successful!\nWelcome ${googleName}`
-        );
+        setShowGoogleOnboarding(true);
 
       } catch (error) {
         console.error(
@@ -1106,7 +1149,6 @@ export function AppProvider({
           error
         );
 
-        // User cancelled Google picker
         if (
           error?.code === '12501' ||
           error?.code === 'SIGN_IN_CANCELLED'
@@ -1122,6 +1164,177 @@ export function AppProvider({
           'Google Sign-In Error ❌',
           error?.message ||
             'Google login failed.'
+        );
+      }
+    };
+
+
+  // ==========================================================
+  // COMPLETE GOOGLE NEW USER PROFILE
+  // ==========================================================
+
+  const completeGoogleProfile =
+    async (profileData) => {
+      try {
+        if (!pendingGoogleUser?.uid) {
+          throw new Error(
+            'Google user session missing.'
+          );
+        }
+
+        const uid =
+          pendingGoogleUser.uid;
+
+        const role =
+          profileData.type === 'provider'
+            ? 'provider'
+            : 'customer';
+
+        const profile = {
+          uid,
+          email:
+            pendingGoogleUser.email || '',
+          name:
+            profileData.name?.trim() ||
+            pendingGoogleUser.name ||
+            '',
+          phone:
+            profileData.phone?.trim() || '',
+          address:
+            profileData.address?.trim() || '',
+          location:
+            profileData.location || null,
+          role,
+          profileUri:
+            profileData.photo || 
+            pendingGoogleUser.profileUri ||
+            null,
+          businessName:
+            role === 'provider'
+              ? profileData.businessName?.trim() || ''
+              : '',
+          tagline:
+            role === 'provider'
+              ? profileData.tagline?.trim() || ''
+              : '',
+          banner:
+            role === 'provider'
+              ? profileData.banner || null
+              : null,
+          authProvider: 'google',
+          isPaid: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await setDoc(
+          doc(db, 'users', uid),
+          profile,
+          { merge: true }
+        );
+
+        // Keep legacy email-based Google record for
+        // backward compatibility with existing app data.
+        if (pendingGoogleUser.email) {
+          await setDoc(
+            doc(
+              db,
+              'users',
+              pendingGoogleUser.email
+            ),
+            profile,
+            { merge: true }
+          );
+        }
+
+        if (profile.phone) {
+          await setDoc(
+            doc(
+              db,
+              'registered_phones',
+              profile.phone
+            ),
+            {
+              phone: profile.phone,
+              name: profile.name,
+              role,
+              uid,
+              email: profile.email,
+              authProvider: 'google',
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
+        }
+
+        const sessionData = {
+          ...profile,
+        };
+
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.USER_SESSION,
+          JSON.stringify(sessionData)
+        );
+
+        setUserRole(role);
+        setAuthName(profile.name);
+        setAuthPhone(profile.phone);
+        setOwnerName(profile.name);
+        setMobileNumber(profile.phone);
+
+        setCustomerProfileUri(
+          profile.profileUri || null
+        );
+
+        setPendingGoogleUser(null);
+        setShowGoogleOnboarding(false);
+
+        Alert.alert(
+          'Profile Created 🎉',
+          `Welcome ${profile.name}!`
+        );
+
+      } catch (error) {
+        console.error(
+          'Google Profile Save Error:',
+          error
+        );
+
+        Alert.alert(
+          'Profile Error ❌',
+          error?.message ||
+            'Profile save nahi ho paya.'
+        );
+
+        throw error;
+      }
+    };
+
+
+  // ==========================================================
+  // CANCEL GOOGLE ONBOARDING
+  // ==========================================================
+
+  const cancelGoogleOnboarding =
+    async () => {
+      setShowGoogleOnboarding(false);
+      setPendingGoogleUser(null);
+
+      try {
+        await GoogleSignin.signOut();
+      } catch (e) {
+        console.log(
+          'Google signOut skipped:',
+          e
+        );
+      }
+
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.log(
+          'Firebase signOut skipped:',
+          e
         );
       }
     };
@@ -2739,6 +2952,10 @@ export function AppProvider({
 
       // Google Auth
       handleGoogleSignIn,
+      showGoogleOnboarding,
+      pendingGoogleUser,
+      completeGoogleProfile,
+      cancelGoogleOnboarding,
 
       // Location
       userLocation,

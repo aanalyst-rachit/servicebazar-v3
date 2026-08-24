@@ -8,13 +8,18 @@ import AdminScreen from '@/screens/AdminScreen';
 import AuthScreen from '@/screens/AuthScreen';
 import CustomerScreen from '@/screens/CustomerScreen';
 import ProviderScreen from '@/screens/ProviderScreen';
+import NewUserProfileScreen from '@/screens/NewUserProfileScreen';
 import { styles } from '@/styles/appStyles';
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ServiceBazarRoot() {
-  const { isDataLoaded, userRole } = useApp();
+  const {
+    isDataLoaded,
+    userRole,
+    showGoogleOnboarding,
+  } = useApp();
 
   if (!isDataLoaded) {
     return (
@@ -28,7 +33,9 @@ export default function ServiceBazarRoot() {
   return (
     <SafeAreaProvider>
         <SafeAreaView style={styles.container}>
-          {!userRole ? (
+          {showGoogleOnboarding ? (
+            <NewUserProfileScreen />
+          ) : !userRole ? (
             <AuthScreen />
           ) : userRole === 'admin' ? (
             <AdminScreen />
