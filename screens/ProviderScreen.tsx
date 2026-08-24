@@ -2,16 +2,14 @@ import AutoProviderBanner from '@/components/AutoProviderBanner';
 import OSMMap from '@/components/OSMMap';
 import SocialFeed from '@/components/SocialFeed';
 import { useApp } from '@/context/AppContext';
+import QuoteStudioScreen from '@/screens/QuoteStudioScreen';
 import { styles } from '@/styles/appStyles';
 import { formatTime } from '@/utils/time';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Image } from 'react-native';
-
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Modal,
+  ActivityIndicator, Image, Modal,
   ScrollView,
   Text,
   TextInput,
@@ -397,7 +395,24 @@ export default function ProviderScreen() {
               'N/A'}
           </Text>
         </View>
+        {/* ====================================================
+            QUOTE STUDIO
+            ==================================================== */}
 
+        {currentTab === 'quoteStudio' && (
+          <View
+            style={{
+              flex: 1,
+              minHeight: 600,
+            }}
+          >
+            <QuoteStudioScreen />
+          </View>
+        )}
+
+        {/* ====================================================
+            FEED
+            ==================================================== */}
         {/* ====================================================
             FEED
             ==================================================== */}
