@@ -1,23 +1,22 @@
 import AutoProviderBanner from '@/components/AutoProviderBanner';
-import SocialFeed from '@/components/SocialFeed';
-
 import OSMMap from '@/components/OSMMap';
+import SocialFeed from '@/components/SocialFeed';
 import { useApp } from '@/context/AppContext';
 import { styles } from '@/styles/appStyles';
 import { formatTime } from '@/utils/time';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Image } from 'react-native';
 
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 interface Region {
@@ -2214,10 +2213,14 @@ export default function ProviderScreen() {
                       marginRight: 12,
                     }}
                   >
-                    <Ionicons
-                      name="storefront"
-                      size={25}
-                      color="#fff"
+                    <Image
+                      source={require('@/assets/images/icon.png')}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                      }}
+                      resizeMode="contain"
                     />
                   </View>
 
