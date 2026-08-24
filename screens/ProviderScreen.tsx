@@ -186,6 +186,13 @@ export default function ProviderScreen() {
       subtitle: 'Appointments',
       icon: 'calendar-outline' as const,
     },
+
+    {
+      key: 'quoteStudio',
+      title: 'Quote Studio',
+      subtitle: 'Create & Share Quotes',
+      icon: 'document-text-outline' as const,
+    },
   ];
 
   const currentTitle =
@@ -195,7 +202,9 @@ export default function ProviderScreen() {
         ? 'Feed'
         : currentTab === 'services'
           ? 'Services'
-          : 'Bookings';
+          : currentTab === 'bookings'
+            ? 'Bookings'
+            : 'Quote Studio';
 
   const currentIcon =
     currentTab === 'profile'
@@ -204,7 +213,9 @@ export default function ProviderScreen() {
         ? 'newspaper-outline'
         : currentTab === 'services'
           ? 'construct-outline'
-          : 'calendar-outline';
+          : currentTab === 'bookings'
+            ? 'calendar-outline'
+            : 'document-text-outline';
 
   return (
     <View style={{ flex: 1 }}>
