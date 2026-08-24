@@ -22,20 +22,19 @@ export const uploadMediaToCloudinary = async (
     localUri,
     mediaType,
     resourceType,
-    uploadUrl,
   });
 
   try {
     const fileInfo = await FileSystem.getInfoAsync(localUri);
 
+    console.log('Cloudinary file check:', {
+      exists: fileInfo.exists,
+      uri: localUri,
+    });
+
     if (!fileInfo.exists) {
       throw new Error(`Local media file does not exist: ${localUri}`);
     }
-
-    console.log('Cloudinary local file verified:', {
-      uri: localUri,
-      size: 'size' in fileInfo ? fileInfo.size : undefined,
-    });
 
     const result = await FileSystem.uploadAsync(
       uploadUrl,
@@ -50,9 +49,9 @@ export const uploadMediaToCloudinary = async (
       }
     );
 
-    console.log('Cloudinary raw response:', {
+    console.log('Cloudinary response:', {
       status: result.status,
-      bodyPreview: result.body?.slice?.(0, 500),
+      body: result.body?.slice?.(0, 500),
     });
 
     if (result.status < 200 || result.status >= 300) {
@@ -61,29 +60,17 @@ export const uploadMediaToCloudinary = async (
       );
     }
 
-    let data: any;
+    const data = JSON.parse(result.body);
 
-    try {
-      data = JSON.parse(result.body);
-    } catch {
-      throw new Error(
-        `Cloudinary returned invalid JSON: ${result.body}`
-      );
-    }
+    const cloudinaryUrl = data?.secure_url || data?.url;
 
-    if (!data?.secure_url && !data?.url) {
+    if (!cloudinaryUrl) {
       throw new Error(
         `Cloudinary upload succeeded but no URL was returned: ${result.body}`
       );
     }
 
-    const cloudinaryUrl = data.secure_url || data.url;
-
-    console.log('Cloudinary upload successful:', {
-      url: cloudinaryUrl,
-      public_id: data.public_id,
-      resource_type: data.resource_type,
-    });
+    console.log('Cloudinary upload successful:', cloudinaryUrl);
 
     return cloudinaryUrl;
   } catch (error: any) {
@@ -91,7 +78,6 @@ export const uploadMediaToCloudinary = async (
       name: error?.name,
       message: error?.message,
       code: error?.code,
-      error,
     });
 
     throw error;

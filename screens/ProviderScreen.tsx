@@ -406,7 +406,14 @@ export default function ProviderScreen() {
               minHeight: 600,
             }}
           >
-            <QuoteStudioScreen />
+            <QuoteStudioScreen
+              profileUri={profileUri}
+              ownerName={authName || ownerName || ''}
+              shopName={shopName || ''}
+              category={category || ''}
+              subcategory={subcategory || ''}
+              phone={authPhone || mobileNumber || ''}
+            />
           </View>
         )}
 

@@ -27,8 +27,45 @@ import {
   setDoc,
   updateDoc, where
 } from 'firebase/firestore';
-import React, { ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
+import { ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Linking } from 'react-native';
+
+export interface Service {
+  id: string;
+  name: string;
+  price: string | number;
+  shopPhone?: string;
+  [key: string]: any;
+}
+
+export interface Booking {
+  id: string;
+  customerName?: string;
+  phone?: string;
+  service?: string;
+  servicesList?: Array<{
+    id: string;
+    name: string;
+    price: string | number;
+    slot?: string;
+  }>;
+  price?: string | number;
+  slot?: string;
+  date?: string;
+  shopPhone?: string;
+  address?: string;
+  status?: string;
+  createdAt?: any;
+  [key: string]: any;
+}
+
+export interface Region {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}
+
 
 type AppContextValue = Record<string, any>;
 
@@ -109,12 +146,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const categories = ['All', ...SERVICE_CATEGORIES];
 
   const [loadingMap, setLoadingMap] = useState(false);
-  const [region, setRegion] = useState({
+  const [region, setRegion] = useState<Region>({
     latitude: 27.8819, longitude: 79.9163, latitudeDelta: 0.01, longitudeDelta: 0.01,
   });
 
   // Services & Auto Slots States
-  const [services, setServices] = useState([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceSpecialty, setNewServiceSpecialty] = useState('');
@@ -135,7 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [slotCapacity, setSlotCapacity] = useState('1');
 
-  const [incomingBookings, setIncomingBookings] = useState([]);
+  const [incomingBookings, setIncomingBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'services' | 'bookings'
 
   const [searchQuery, setSearchQuery] = useState('');

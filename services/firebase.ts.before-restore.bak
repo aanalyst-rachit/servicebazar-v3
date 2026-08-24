@@ -1,0 +1,46 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  getReactNativePersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyCSUFhcnN5zZgRjxNvylglQiMeNSVu0Zvs',
+  authDomain: 'bookmyslot-1264c.firebaseapp.com',
+  projectId: 'bookmyslot-1264c',
+  storageBucket: 'bookmyslot-1264c.firebasestorage.app',
+  messagingSenderId: '139153043703',
+  appId: '1:139153043703:web:95935dfaf328eeef1fe3f2',
+  measurementId: 'G-EGSJ3Q87D2',
+};
+
+// Firebase App singleton
+const app = getApps().length > 0
+  ? getApp()
+  : initializeApp(firebaseConfig);
+
+// Firestore
+export const db = getFirestore(app);
+
+// Firebase Auth singleton
+let authInstance: Auth;
+
+try {
+  authInstance = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch (error: any) {
+  if (error?.code === 'auth/already-initialized') {
+    authInstance = getAuth(app);
+  } else {
+    throw error;
+  }
+}
+
+export const auth = authInstance;
+
+export default app;
