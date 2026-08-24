@@ -24,7 +24,7 @@ type QuoteCategory =
   | 'Life'
   | 'Religious';
 
-type LanguageOption = 'Hindi' | 'English' | 'Hinglish' | 'Marathi' | 'Gujarati';
+type LanguageOption = 'Hindi' | 'English' | 'Hinglish' | 'Marathi' | 'Gujarati' | 'Urdu';
 
 interface ThemeOption {
   id: string;
@@ -49,23 +49,24 @@ const LANGUAGES: LanguageOption[] = [
   'Hinglish',
   'Marathi',
   'Gujarati',
+  'Urdu',
 ];
 
 const CARD_THEMES: ThemeOption[] = [
   {
-    id: 'light-slate',
-    name: 'Classic Light',
-    colors: ['#ffffff', '#f1f5f9'],
-    textColor: '#0f172a',
-    subTextColor: '#64748b',
-    accentColor: '#4f46e5',
+    id: 'rose-gold',
+    name: 'Rose Pearl',
+    colors: ['#fff1f2', '#fecdd3'],
+    textColor: '#881337',
+    subTextColor: '#9f1239',
+    accentColor: '#e11d48',
   },
   {
     id: 'indigo-glow',
     name: 'Indigo Glow',
-    colors: ['#4f46e5', '#3730a3'],
+    colors: ['#3b82f6', '#1d4ed8'],
     textColor: '#ffffff',
-    subTextColor: '#c7d2fe',
+    subTextColor: '#93c5fd',
     accentColor: '#fbbf24',
   },
   {
@@ -93,12 +94,12 @@ const CARD_THEMES: ThemeOption[] = [
     accentColor: '#34d399',
   },
   {
-    id: 'rose-gold',
-    name: 'Rose Pearl',
-    colors: ['#fff1f2', '#fecdd3'],
-    textColor: '#881337',
-    subTextColor: '#9f1239',
-    accentColor: '#e11d48',
+    id: 'light-slate',
+    name: 'Classic Light',
+    colors: ['#ffffff', '#f1f5f9'],
+    textColor: '#0f172a',
+    subTextColor: '#64748b',
+    accentColor: '#2563eb',
   },
 ];
 
@@ -120,21 +121,51 @@ export default function QuoteStudioScreen({
   phone = '',
 }: QuoteStudioProps) {
   const quoteCardRef = useRef<View>(null);
-  
-  const [category, setCategory] = useState<QuoteCategory>('Motivational');
-  const [language, setLanguage] = useState<LanguageOption>('Hindi');
-  const [quote, setQuote] = useState('अपनी यात्रा पर विश्वास रखें और आगे बढ़ते रहें।');
-  const [loading, setLoading] = useState<boolean>(false);
-  const [selectedTheme, setSelectedTheme] = useState<ThemeOption>(CARD_THEMES[0]);
 
-  // Dynamic Gemini API Fetch Call
+  const [category, setCategory] = useState<QuoteCategory>('Religious');
+  const [language, setLanguage] = useState<LanguageOption>('Hindi');
+  const [quote, setQuote] = useState('ईश्वर पर अटूट विश्वास ही आपकी सबसे बड़ी शक्ति है।');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeOption>(CARD_THEMES[1]);
+
+  // Enhanced Prompt & Category Aware Gemini AI Function
   const fetchAIQuote = async (selectedCat: QuoteCategory, selectedLang: LanguageOption) => {
     setLoading(true);
     try {
-      const prompt = `Generate a short, inspiring, 1-line ${selectedCat} quote in ${selectedLang} language. Return ONLY the quote text without any quotation marks or extra explanation.`;
+      const timestamp = Date.now();
+      const randomSeed = Math.floor(Math.random() * 999999);
+
+      // Category Specific Prompt Boost
+      let categoryPromptDetails = `Category: ${selectedCat}.`;
+      if (selectedCat === 'Religious') {
+        categoryPromptDetails = `Category: Religious / Spiritual / Devotional / Bhagavad Gita / Faith in God. Make sure it is deeply spiritual and religious.`;
+      }
+
+      // Language Rules
+      let langInstruction = `Language: ${selectedLang}.`;
+      if (selectedLang === 'English') {
+        langInstruction = 'Language: English (Latin script only).';
+      } else if (selectedLang === 'Hinglish') {
+        langInstruction = 'Language: Hinglish (Hindi words using English/Latin alphabets).';
+      } else if (selectedLang === 'Hindi') {
+        langInstruction = 'Language: Hindi (Strictly in Devanagari script).';
+      } else if (selectedLang === 'Marathi') {
+        langInstruction = 'Language: Marathi (Devanagari script).';
+      } else if (selectedLang === 'Gujarati') {
+        langInstruction = 'Language: Gujarati (Gujarati script).';
+      } else if (selectedLang === 'Urdu') {
+        langInstruction = 'Language: Urdu (Urdu Nastaliq / Perso-Arabic script).';
+      }
+
+      const promptText = `Generate a single short, inspirational, 1-line quote.
+${categoryPromptDetails}
+${langInstruction}
+Unique ID: ${timestamp}-${randomSeed}
+
+Rule: Output ONLY the raw quote text. Do NOT add quotes, context, commentary, or intro text.`;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: {
@@ -143,24 +174,32 @@ export default function QuoteStudioScreen({
           body: JSON.stringify({
             contents: [
               {
-                parts: [{ text: prompt }],
+                parts: [{ text: promptText }],
               },
             ],
+            generationConfig: {
+              temperature: 1.0,
+              topP: 0.95,
+            },
           }),
         }
       );
 
       const data = await response.json();
-      
+
       if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        const generatedText = data.candidates[0].content.parts[0].text.trim().replace(/^["']|["']$/g, '');
-        setQuote(generatedText);
+        const rawText = data.candidates[0].content.parts[0].text;
+        const cleanedText = rawText
+          .trim()
+          .replace(/^["'«“]|["'»”]$/g, '')
+          .replace(/\n/g, ' ');
+
+        setQuote(cleanedText);
       } else {
-        setQuote('सफलता का रहस्य निरंतरता में है।');
+        console.warn('Invalid API response structure:', data);
       }
     } catch (error) {
-      console.error('Gemini API Error:', error);
-      setQuote('सफलता का अभ्यास हर दिन किया जाता है।');
+      console.error('Gemini API Fetch Error:', error);
     } finally {
       setLoading(false);
     }
@@ -209,7 +248,7 @@ export default function QuoteStudioScreen({
         <View style={styles.headerText}>
           <Text style={styles.title}>Quote Studio AI</Text>
           <Text style={styles.subtitle}>
-            AI-powered multilingual quote generator
+            Create modern & stylized AI quotes
           </Text>
         </View>
       </View>
@@ -309,7 +348,7 @@ export default function QuoteStudioScreen({
                 >
                   {isSelected && (
                     <Ionicons
-                      name="checkmark-sharp"
+                      name="checkmark"
                       size={14}
                       color={theme.textColor}
                     />
@@ -321,8 +360,8 @@ export default function QuoteStudioScreen({
           })}
         </ScrollView>
 
-        {/* Dynamic Quote Card */}
-        <Text style={styles.sectionTitle}>Your Quote</Text>
+        {/* Stylized Dynamic Quote Card */}
+        <Text style={styles.sectionTitle}>Your Quote Card</Text>
         <View ref={quoteCardRef} collapsable={false} style={styles.quoteCardWrapper}>
           <LinearGradient
             colors={selectedTheme.colors}
@@ -330,6 +369,12 @@ export default function QuoteStudioScreen({
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
+            {/* Background Vector Art Elements */}
+            <View style={[styles.vectorCircleTop, { borderColor: selectedTheme.subTextColor + '25' }]} />
+            <View style={[styles.vectorCircleBottom, { backgroundColor: selectedTheme.accentColor + '20' }]} />
+            <View style={[styles.vectorLineAccent, { backgroundColor: selectedTheme.accentColor }]} />
+
+            {/* Profile Section */}
             <View style={styles.profileRow}>
               {profileUri ? (
                 <Image source={{ uri: profileUri }} style={styles.profileImage} />
@@ -344,14 +389,14 @@ export default function QuoteStudioScreen({
                   style={[styles.ownerName, { color: selectedTheme.textColor }]}
                   numberOfLines={1}
                 >
-                  {ownerName || 'Service Provider'}
+                  {ownerName || 'Pro2'}
                 </Text>
 
                 <Text
                   style={[styles.shopName, { color: selectedTheme.accentColor }]}
                   numberOfLines={1}
                 >
-                  {shopName || 'ServiceBazar Provider'}
+                  {shopName || 'Pro2 ki dukan'}
                 </Text>
 
                 {!!providerCategory && (
@@ -366,40 +411,42 @@ export default function QuoteStudioScreen({
               </View>
             </View>
 
-            <View style={[styles.quoteDivider, { backgroundColor: selectedTheme.subTextColor + '30' }]} />
+            <View style={[styles.quoteDivider, { backgroundColor: selectedTheme.subTextColor + '35' }]} />
 
-            <View style={styles.quoteIconContainer}>
-              <Ionicons name="chatbubble-ellipses" size={32} color={selectedTheme.accentColor + '80'} />
-            </View>
-
+            {/* Quote Body Area */}
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={selectedTheme.accentColor} />
                 <Text style={[styles.loadingText, { color: selectedTheme.subTextColor }]}>
-                  AI is creating quote...
+                  AI is creating dynamic quote...
                 </Text>
               </View>
             ) : (
-              <TextInput
-                value={quote}
-                onChangeText={setQuote}
-                multiline
-                textAlign="center"
-                style={[styles.quoteInput, { color: selectedTheme.textColor }]}
-                placeholder="Write your quote..."
-                placeholderTextColor={selectedTheme.subTextColor}
-              />
+              <View style={styles.quoteContentContainer}>
+                <TextInput
+                  value={quote}
+                  onChangeText={setQuote}
+                  multiline
+                  textAlign="center"
+                  style={[styles.quoteInput, { color: selectedTheme.textColor }]}
+                  placeholder="Write your quote..."
+                  placeholderTextColor={selectedTheme.subTextColor}
+                />
+              </View>
             )}
 
+            {/* Card Footer Watermark */}
             <View style={styles.brandContainer}>
-              <Text style={[styles.brandText, { color: selectedTheme.accentColor }]}>
-                SERVICEBAZAR
-              </Text>
+              <View style={[styles.brandBadge, { backgroundColor: selectedTheme.subTextColor + '20' }]}>
+                <Text style={[styles.brandText, { color: selectedTheme.accentColor }]}>
+                  SERVICEBAZAR
+                </Text>
+              </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Buttons */}
+        {/* Action Buttons */}
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={loading}
@@ -526,40 +573,69 @@ const styles = StyleSheet.create({
   },
   quoteCardWrapper: {
     borderRadius: 24,
-    elevation: 8,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    elevation: 10,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
     overflow: 'hidden',
     marginTop: 4,
   },
   quoteCardGradient: {
     padding: 24,
-    minHeight: 280,
+    minHeight: 300,
     justifyContent: 'space-between',
-    alignItems: 'center',
+    position: 'relative',
+  },
+  vectorCircleTop: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 25,
+    zIndex: 1,
+  },
+  vectorCircleBottom: {
+    position: 'absolute',
+    bottom: -40,
+    left: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    zIndex: 1,
+  },
+  vectorLineAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    width: 45,
+    height: 4,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    zIndex: 2,
   },
   profileRow: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    zIndex: 2,
   },
   profileImage: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 2,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2.5,
     borderColor: '#ffffff',
   },
   profilePlaceholder: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: '#ffffff',
   },
   profileInfo: {
@@ -567,9 +643,9 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   ownerName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   shopName: {
     marginTop: 2,
@@ -584,13 +660,15 @@ const styles = StyleSheet.create({
   quoteDivider: {
     width: '100%',
     height: 1,
-    marginBottom: 16,
+    marginVertical: 14,
+    zIndex: 2,
   },
-  quoteIconContainer: {
+  quoteContentContainer: {
+    zIndex: 2,
     width: '100%',
-    alignItems: 'flex-start',
-    paddingLeft: 8,
-    marginBottom: -8,
+    marginVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   quoteInput: {
     width: '100%',
@@ -604,6 +682,7 @@ const styles = StyleSheet.create({
     minHeight: 110,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
   },
   loadingText: {
     marginTop: 8,
@@ -613,10 +692,15 @@ const styles = StyleSheet.create({
   brandContainer: {
     width: '100%',
     alignItems: 'flex-end',
-    marginTop: 8,
+    zIndex: 2,
+  },
+  brandBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   brandText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1.5,
   },
