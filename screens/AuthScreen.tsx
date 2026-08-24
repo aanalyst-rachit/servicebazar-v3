@@ -1,11 +1,10 @@
 import { useApp } from '@/context/AppContext';
 import { styles } from '@/styles/appStyles';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function AuthScreen() {
-  const { selectedSignupRole, setSelectedSignupRole, authName, setAuthName, authPhone, setAuthPhone, handleSignUp } = useApp();
+  const { selectedSignupRole, setSelectedSignupRole, authName, setAuthName, authPhone, setAuthPhone, handleSignUp, handleGoogleSignIn } = useApp();
 
   return (
           <ScrollView   keyboardShouldPersistTaps="always" keyboardDismissMode="none" contentContainerStyle={styles.authContainer}>
@@ -43,6 +42,16 @@ export default function AuthScreen() {
 
               <TouchableOpacity style={styles.btn} onPress={handleSignUp}>
                 <Text style={styles.btnText}>Continue 🚀</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.btn, { marginTop: 10, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb' }]} 
+                onPress={handleGoogleSignIn}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="logo-google" size={20} color="#4285F4" />
+                  <Text style={[styles.btnText, { color: '#1f2937' }]}>Continue with Google</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </ScrollView>
