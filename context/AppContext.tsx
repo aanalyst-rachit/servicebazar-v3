@@ -146,6 +146,9 @@ export function AppProvider({
   const [userRole, setUserRole] = useState(null);
   const [authName, setAuthName] = useState('');
   const [authPhone, setAuthPhone] = useState('');
+
+  // Firebase Auth UID is the ONLY current-user identity.
+  const [firebaseUid, setFirebaseUid] = useState('');
   const [selectedSignupRole, setSelectedSignupRole] =
     useState('customer');
 
@@ -447,27 +450,87 @@ export function AppProvider({
   useEffect(() => {
     let isMounted = true;
 
-    loadUserSession();
+    // Location is independent of authentication.
     fetchUserCurrentLocation();
 
     // --------------------------------------------------------
     // Firebase Auth Listener
+    //
+    // Firebase UID controls the current-user lifecycle.
     // --------------------------------------------------------
 
     const unsubscribeAuth = onAuthStateChanged(
       auth,
       (user) => {
-        if (user) {
+        if (!isMounted) return;
+
+        if (user?.uid) {
           console.log(
             'Authenticated User UID:',
             user.uid
           );
+
+          setFirebaseUid(user.uid);
+        } else {
+          console.log(
+            'No authenticated Firebase user.'
+          );
+
+          setFirebaseUid('');
+
+          // --------------------------------------------------
+          // Clear ALL current-user profile state.
+          //
+          // This prevents previous user's business details
+          // from leaking into a new login.
+          // --------------------------------------------------
+
+          setUserRole('');
+
+          setAuthName('');
+          setAuthPhone('');
+          setOwnerName('');
+          setMobileNumber('');
+
+          setShopDetails({
+            shopName: '',
+            category: 'Salon & Spa',
+            subcategory: '',
+            ownerName: '',
+            mobileNumber: '',
+            address: '',
+            bannerUri: null,
+            profileUri: null,
+            frontImageUri: null,
+            insideImageUri: null,
+            region: null,
+            avgRating: 1.0,
+            totalReviews: 0,
+          });
+
+          setShopName('');
+          setCategory('Salon & Spa');
+          setSubcategory('');
+
+          setAddress('');
+          setRegion(null);
+
+          setBannerUri(null);
+          setProfileUri(null);
+          setFrontImageUri(null);
+          setInsideImageUri(null);
+
+          setCustomerProfileUri(null);
+          setIsEditingProfile(true);
         }
       }
     );
 
     // --------------------------------------------------------
     // All Shops Listener
+    //
+    // Public/provider discovery data.
+    // This is NOT used as current-user identity.
     // --------------------------------------------------------
 
     const unsubscribeAllShops = onSnapshot(
@@ -519,116 +582,6 @@ export function AppProvider({
     );
 
     // --------------------------------------------------------
-    // Profile Listener
-    // --------------------------------------------------------
-
-    const cleanPhone = authPhone.trim();
-
-    const docRef = cleanPhone
-      ? doc(db, 'profile', cleanPhone)
-      : doc(db, 'profile', 'shop_info');
-
-    const unsubscribeProfile = onSnapshot(
-      docRef,
-      (docSnap) => {
-        if (!isMounted) return;
-
-        if (docSnap.exists()) {
-          const p = docSnap.data();
-
-          setShopDetails(p);
-
-          setShopName(
-            p.shopName || ''
-          );
-
-          setCategory(
-            p.category || 'Salon & Spa'
-          );
-
-          setSubcategory(
-            p.subcategory || ''
-          );
-
-          setFrontImageUri(
-            p.frontImageUri || null
-          );
-
-          setInsideImageUri(
-            p.insideImageUri || null
-          );
-
-          setOwnerName(
-            authName || p.ownerName || ''
-          );
-
-          setMobileNumber(
-            cleanPhone || p.mobileNumber || ''
-          );
-
-          setAddress(
-            p.address || ''
-          );
-
-          setBannerUri(
-            p.bannerUri || null
-          );
-
-          setProfileUri(
-            p.profileUri || null
-          );
-
-          if (p.region) {
-            setRegion(p.region);
-          }
-
-          if (
-            p.shopName &&
-            p.shopName.trim() !== ''
-          ) {
-            setIsEditingProfile(false);
-          } else {
-            setIsEditingProfile(true);
-          }
-        } else {
-          setIsEditingProfile(true);
-        }
-      }
-    );
-
-    // --------------------------------------------------------
-    // Customer Listener
-    // --------------------------------------------------------
-
-    let unsubscribeCustomer = () => {};
-
-    if (cleanPhone) {
-      unsubscribeCustomer = onSnapshot(
-        doc(db, 'users', cleanPhone),
-        (snap) => {
-          if (!isMounted) return;
-
-          if (snap.exists()) {
-            const u = snap.data();
-
-            setCustomerProfileUri(
-              u.profileUri || null
-            );
-
-            setCustomerPaid(
-              Boolean(
-                u.isPaid ||
-                u.paid ||
-                u.plan === 'paid' ||
-                u.membership === 'paid'
-              )
-            );
-          }
-        }
-      );
-    }
-
-    // --------------------------------------------------------
     // Bookings Listener
     // --------------------------------------------------------
 
@@ -664,11 +617,205 @@ export function AppProvider({
       unsubscribeAuth();
       unsubscribeAllShops();
       unsubscribeServices();
-      unsubscribeProfile();
-      unsubscribeCustomer();
       unsubscribeBookings();
     };
   }, []);
+
+
+  // ==========================================================
+  // MASTER USER LISTENER
+  //
+  // users/{firebaseUid} is the ONLY source of truth for the
+  // currently authenticated user's profile.
+  // ==========================================================
+
+  useEffect(() => {
+    if (!firebaseUid) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const userRef = doc(
+      db,
+      'users',
+      firebaseUid
+    );
+
+    const unsubscribeUser = onSnapshot(
+      userRef,
+      (snap) => {
+        if (!isMounted) return;
+
+        if (!snap.exists()) {
+          // --------------------------------------------------
+          // Brand-new Firebase UID.
+          //
+          // IMPORTANT:
+          // Do not allow any old local/profile data to remain.
+          // --------------------------------------------------
+
+          setUserRole('');
+
+          setAuthName('');
+          setAuthPhone('');
+          setOwnerName('');
+          setMobileNumber('');
+
+          setShopDetails({
+            shopName: '',
+            category: 'Salon & Spa',
+            subcategory: '',
+            ownerName: '',
+            mobileNumber: '',
+            address: '',
+            bannerUri: null,
+            profileUri: null,
+            frontImageUri: null,
+            insideImageUri: null,
+            region: null,
+            avgRating: 1.0,
+            totalReviews: 0,
+          });
+
+          setShopName('');
+          setCategory('Salon & Spa');
+          setSubcategory('');
+
+          setAddress('');
+          setRegion(null);
+
+          setBannerUri(null);
+          setProfileUri(null);
+          setFrontImageUri(null);
+          setInsideImageUri(null);
+
+          setCustomerProfileUri(null);
+          setIsEditingProfile(true);
+
+          console.log(
+            'MASTER PROFILE: New UID - no users/{uid} document.'
+          );
+
+          return;
+        }
+
+        const u = snap.data();
+
+        console.log(
+          'MASTER PROFILE LOADED:',
+          firebaseUid
+        );
+
+        // ----------------------------------------------------
+        // MASTER IDENTITY
+        // ----------------------------------------------------
+
+        setUserRole(
+          u.role || ''
+        );
+
+        setAuthName(
+          u.name || ''
+        );
+
+        setAuthPhone(
+          u.phone || ''
+        );
+
+        setOwnerName(
+          u.name || ''
+        );
+
+        setMobileNumber(
+          u.phone || ''
+        );
+
+        setCustomerProfileUri(
+          u.profileUri || null
+        );
+
+        // ----------------------------------------------------
+        // MASTER BUSINESS PROFILE
+        // ----------------------------------------------------
+
+        if (
+          u.role === 'provider'
+        ) {
+          setShopDetails(u);
+
+          setShopName(
+            u.shopName ||
+            u.businessName ||
+            ''
+          );
+
+          setCategory(
+            u.category ||
+            'Salon & Spa'
+          );
+
+          setSubcategory(
+            u.subcategory || ''
+          );
+
+          setAddress(
+            u.address || ''
+          );
+
+          setRegion(
+            u.location ||
+            u.region ||
+            null
+          );
+
+          setBannerUri(
+            u.bannerUri ||
+            u.banner ||
+            null
+          );
+
+          setProfileUri(
+            u.profileUri ||
+            null
+          );
+
+          setFrontImageUri(
+            u.frontImageUri ||
+            null
+          );
+
+          setInsideImageUri(
+            u.insideImageUri ||
+            null
+          );
+
+          setIsEditingProfile(
+            !(
+              u.shopName ||
+              u.businessName
+            )
+          );
+        } else {
+          // Customer/admin should not inherit provider data.
+          setShopDetails({
+            ...u,
+          });
+        }
+      },
+      (error) => {
+        console.error(
+          'MASTER USER LISTENER ERROR:',
+          error
+        );
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribeUser();
+    };
+  }, [firebaseUid]);
 
 
   // ==========================================================
@@ -766,27 +913,47 @@ export function AppProvider({
           const parsed =
             JSON.parse(session);
 
-          setUserRole(parsed.role);
+          const currentUid =
+            auth.currentUser?.uid || '';
 
-          setAuthName(
-            parsed.name || ''
-          );
+          // Local session is only valid when it belongs to the
+          // currently authenticated Firebase UID.
+          if (
+            currentUid &&
+            parsed.uid &&
+            parsed.uid === currentUid
+          ) {
+            setUserRole(parsed.role || '');
 
-          setOwnerName(
-            parsed.name || ''
-          );
+            setAuthName(
+              parsed.name || ''
+            );
 
-          setAuthPhone(
-            parsed.phone || ''
-          );
+            setOwnerName(
+              parsed.name || ''
+            );
 
-          setMobileNumber(
-            parsed.phone || ''
-          );
+            setAuthPhone(
+              parsed.phone || ''
+            );
 
-          if (parsed.profileUri) {
-            setCustomerProfileUri(
-              parsed.profileUri
+            setMobileNumber(
+              parsed.phone || ''
+            );
+
+            if (parsed.profileUri) {
+              setCustomerProfileUri(
+                parsed.profileUri
+              );
+            }
+          } else {
+            // Never restore a session belonging to another UID.
+            await AsyncStorage.removeItem(
+              STORAGE_KEYS.USER_SESSION
+            );
+
+            console.log(
+              'Stale USER_SESSION removed.'
             );
           }
         }
@@ -881,14 +1048,17 @@ export function AppProvider({
           doc(
             db,
             'users',
-            cleanPhone
+            uid
           ),
           {
+            uid: uid,
             name: authName,
             phone: cleanPhone,
             role: effectiveRole,
-            uid: uid,
+            email: '',
+            authProvider: 'anonymous',
             createdAt: new Date(),
+            updatedAt: new Date(),
             isPaid: false,
           },
           { merge: true }
@@ -1044,91 +1214,59 @@ export function AppProvider({
         }
 
         // ----------------------------------------------------
-        // BACKWARD COMPATIBILITY
-        // Existing Google users were previously stored as
-        // users/{email}. Reuse that data and migrate it to
-        // users/{uid}.
-        // ----------------------------------------------------
-
-        if (googleEmail) {
-          const legacyRef =
-            doc(db, 'users', googleEmail);
-
-          const legacySnap =
-            await getDoc(legacyRef);
-
-          if (legacySnap.exists()) {
-            const legacy =
-              legacySnap.data();
-
-            const migrated = {
-              ...legacy,
-              uid,
-              email:
-                legacy.email || googleEmail,
-              name:
-                legacy.name || googleName,
-              phone:
-                legacy.phone || googlePhone,
-              profileUri:
-                legacy.profileUri || googlePhoto,
-              role:
-                legacy.role || 'customer',
-              authProvider: 'google',
-              updatedAt: new Date(),
-            };
-
-            await setDoc(
-              uidRef,
-              migrated,
-              { merge: true }
-            );
-
-            const sessionData = {
-              ...migrated,
-              uid,
-            };
-
-            await AsyncStorage.setItem(
-              STORAGE_KEYS.USER_SESSION,
-              JSON.stringify(sessionData)
-            );
-
-            setUserRole(
-              migrated.role
-            );
-
-            setAuthName(
-              migrated.name || ''
-            );
-
-            setAuthPhone(
-              migrated.phone || ''
-            );
-
-            setOwnerName(
-              migrated.name || ''
-            );
-
-            setMobileNumber(
-              migrated.phone || ''
-            );
-
-            if (migrated.profileUri) {
-              setCustomerProfileUri(
-                migrated.profileUri
-              );
-            }
-
-            return;
-          }
-        }
-
-        // ----------------------------------------------------
         // BRAND NEW GOOGLE USER
         // Do NOT automatically make them a customer.
         // Show onboarding form instead.
         // ----------------------------------------------------
+
+        // ----------------------------------------------------
+        // BRAND NEW GOOGLE USER
+        //
+        // This UID has no users/{uid} master document.
+        // Therefore this is a genuinely new profile.
+        //
+        // Clear ALL previous user's local profile state before
+        // showing onboarding. Never inherit old shop details.
+        // ----------------------------------------------------
+
+        setUserRole('');
+        setAuthName(googleName);
+        setAuthPhone(googlePhone);
+        setOwnerName(googleName);
+        setMobileNumber(googlePhone);
+
+        setShopDetails({
+          shopName: '',
+          category: 'Salon & Spa',
+          subcategory: '',
+          ownerName: googleName,
+          mobileNumber: googlePhone,
+          address: '',
+          bannerUri: null,
+          profileUri: googlePhoto,
+          frontImageUri: null,
+          insideImageUri: null,
+          region: null,
+          avgRating: 1.0,
+          totalReviews: 0,
+        });
+
+        setShopName('');
+        setCategory('Salon & Spa');
+        setSubcategory('');
+        setAddress('');
+        setRegion(null);
+
+        setBannerUri(null);
+        setProfileUri(googlePhoto);
+        setFrontImageUri(null);
+        setInsideImageUri(null);
+
+        setCustomerProfileUri(
+          googlePhoto
+        );
+
+        setIsEditingProfile(true);
 
         setPendingGoogleUser({
           uid,
@@ -1232,6 +1370,58 @@ export function AppProvider({
           profile,
           { merge: true }
         );
+
+        // ----------------------------------------------------
+        // Provider business-profile bridge
+        //
+        // Existing ProviderScreen/business flow uses
+        // profile/{phone}. Keep that document synchronized
+        // with the new master users/{uid} profile.
+        // ----------------------------------------------------
+
+        if (
+          role === 'provider' &&
+          profile.phone
+        ) {
+          await setDoc(
+            doc(
+              db,
+              'profile',
+              profile.phone
+            ),
+            {
+              shopName:
+                profile.businessName || '',
+              ownerName:
+                profile.name || '',
+              mobileNumber:
+                profile.phone || '',
+              address:
+                profile.address || '',
+              region:
+                profile.location || null,
+              location:
+                profile.location || null,
+              bannerUri:
+                profile.banner || null,
+              profileUri:
+                profile.profileUri || null,
+              tagline:
+                profile.tagline || '',
+              region:
+                profile.location || null,
+              location:
+                profile.location || null,
+              uid,
+              email:
+                profile.email || '',
+              role: 'provider',
+              authProvider: 'google',
+              updatedAt: new Date(),
+            },
+            { merge: true }
+          );
+        }
 
         // Keep legacy email-based Google record for
         // backward compatibility with existing app data.
@@ -1403,6 +1593,142 @@ export function AppProvider({
 
 
   // ==========================================================
+  // MASTER USER PROFILE SYNC
+  //
+  // users/{uid} is the single source of truth for user identity.
+  // Provider business data is additionally mirrored to
+  // profile/{phone} for backward compatibility.
+  // ==========================================================
+
+  const syncMasterUserProfile = async (
+    updates: Record<string, any> = {}
+  ) => {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser?.uid) {
+      throw new Error(
+        'Firebase user session missing.'
+      );
+    }
+
+    const uid = currentUser.uid;
+
+    const masterRef = doc(
+      db,
+      'users',
+      uid
+    );
+
+    const masterSnap = await getDoc(
+      masterRef
+    );
+
+    const existingMaster =
+      masterSnap.exists()
+        ? masterSnap.data()
+        : {};
+
+    const masterProfile = {
+      ...existingMaster,
+      uid,
+      name:
+        updates.name ??
+        existingMaster.name ??
+        authName ??
+        '',
+      email:
+        updates.email ??
+        existingMaster.email ??
+        currentUser.email ??
+        '',
+      phone:
+        updates.phone ??
+        existingMaster.phone ??
+        authPhone ??
+        mobileNumber ??
+        '',
+      role:
+        updates.role ??
+        existingMaster.role ??
+        userRole ??
+        'customer',
+      profileUri:
+        updates.profileUri ??
+        existingMaster.profileUri ??
+        customerProfileUri ??
+        null,
+      address:
+        updates.address ??
+        existingMaster.address ??
+        address ??
+        '',
+      location:
+        updates.location ??
+        existingMaster.location ??
+        region ??
+        null,
+      updatedAt:
+        new Date(),
+    };
+
+    await setDoc(
+      masterRef,
+      masterProfile,
+      { merge: true }
+    );
+
+    // Keep local session aligned with master profile.
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.USER_SESSION,
+      JSON.stringify(masterProfile)
+    );
+
+    setAuthName(
+      masterProfile.name || ''
+    );
+
+    setAuthPhone(
+      masterProfile.phone || ''
+    );
+
+    setOwnerName(
+      masterProfile.name || ''
+    );
+
+    setMobileNumber(
+      masterProfile.phone || ''
+    );
+
+    setCustomerProfileUri(
+      masterProfile.profileUri || null
+    );
+
+    if (masterProfile.address !== undefined) {
+      setAddress(
+        masterProfile.address || ''
+      );
+    }
+
+    if (masterProfile.location) {
+      setRegion(
+        masterProfile.location
+      );
+    }
+
+    if (
+      masterProfile.role &&
+      masterProfile.role !== userRole
+    ) {
+      setUserRole(
+        masterProfile.role
+      );
+    }
+
+    return masterProfile;
+  };
+
+
+  // ==========================================================
   // SAVE PROVIDER PROFILE
   // ==========================================================
 
@@ -1418,12 +1744,28 @@ export function AppProvider({
       }
 
       try {
-        const fixedMobile =
-          authPhone || mobileNumber;
+        // ====================================================
+        // FIREBASE UID IS THE MASTER IDENTITY
+        // ====================================================
 
-        // ----------------------------------------------------
-        // Migrate old local image URI to Cloudinary
-        // ----------------------------------------------------
+        const currentUser =
+          auth.currentUser;
+
+        if (!currentUser?.uid) {
+          throw new Error(
+            'Firebase user session missing.'
+          );
+        }
+
+        const uid =
+          currentUser.uid;
+
+        const fixedMobile =
+          authPhone || mobileNumber || '';
+
+        // ====================================================
+        // CLOUD IMAGE MIGRATION
+        // ====================================================
 
         const cloudBannerUri =
           await ensureCloudImageUri(
@@ -1465,20 +1807,58 @@ export function AppProvider({
           cloudInsideImageUri
         );
 
-        const dataToSave = {
-          shopName,
-          category,
-          subcategory,
+        // ====================================================
+        // MASTER PROVIDER PROFILE
+        //
+        // users/{uid} is the single source of truth.
+        // ====================================================
 
-          ownerName:
-            authName || ownerName,
+        const masterProviderData = {
+          uid,
 
-          mobileNumber:
+          name:
+            authName ||
+            ownerName ||
+            '',
+
+          email:
+            currentUser.email ||
+            '',
+
+          phone:
             fixedMobile,
 
-          address,
+          role:
+            'provider',
+
+          authProvider:
+            currentUser.providerData?.[0]?.providerId ||
+            'password',
+
+          // New User Profile Screen uses businessName.
+          businessName:
+            shopName,
+
+          // ProviderScreen currently uses shopName.
+          shopName:
+            shopName,
+
+          category:
+            category || '',
+
+          subcategory:
+            subcategory || '',
+
+          address:
+            address || '',
+
+          location:
+            region || null,
 
           bannerUri:
+            cloudBannerUri,
+
+          banner:
             cloudBannerUri,
 
           profileUri:
@@ -1490,8 +1870,6 @@ export function AppProvider({
           insideImageUri:
             cloudInsideImageUri,
 
-          region,
-
           avgRating:
             shopDetails.avgRating ||
             1.0,
@@ -1499,29 +1877,98 @@ export function AppProvider({
           totalReviews:
             shopDetails.totalReviews ||
             0,
+
+          updatedAt:
+            new Date(),
         };
 
-        const docRef =
-          fixedMobile
-            ? doc(
-                db,
-                'profile',
-                fixedMobile
-              )
-            : doc(
-                db,
-                'profile',
-                'shop_info'
-              );
+        // ====================================================
+        // PRIMARY WRITE
+        // ====================================================
 
         await setDoc(
-          docRef,
-          dataToSave,
-          { merge: true }
+          doc(
+            db,
+            'users',
+            uid
+          ),
+          masterProviderData,
+          {
+            merge: true,
+          }
+        );
+
+        // ====================================================
+        // BACKWARD-COMPATIBILITY MIRROR
+        //
+        // Existing old provider/service code may still read
+        // profile/{phone}. It is NOT the master record.
+        // ====================================================
+
+        if (fixedMobile) {
+          await setDoc(
+            doc(
+              db,
+              'profile',
+              fixedMobile
+            ),
+            {
+              ...masterProviderData,
+
+              mobileNumber:
+                fixedMobile,
+
+              ownerName:
+                masterProviderData.name,
+
+              uid,
+
+              updatedAt:
+                new Date(),
+            },
+            {
+              merge: true,
+            }
+          );
+        }
+
+        // ====================================================
+        // LOCAL SESSION = SAME MASTER DATA
+        // ====================================================
+
+        await AsyncStorage.setItem(
+          STORAGE_KEYS.USER_SESSION,
+          JSON.stringify(
+            masterProviderData
+          )
+        );
+
+        // ====================================================
+        // UPDATE CURRENT APP STATE
+        // ====================================================
+
+        setUserRole(
+          'provider'
+        );
+
+        setAuthName(
+          masterProviderData.name
+        );
+
+        setAuthPhone(
+          masterProviderData.phone
+        );
+
+        setOwnerName(
+          masterProviderData.name
+        );
+
+        setMobileNumber(
+          masterProviderData.phone
         );
 
         setShopDetails(
-          dataToSave
+          masterProviderData
         );
 
         setIsEditingProfile(
@@ -1530,16 +1977,24 @@ export function AppProvider({
 
         Alert.alert(
           'Success 🎉',
-          'Profile Firestore Cloud par save ho gayi!'
+          'Profile successfully UID master profile mein save ho gayi.'
         );
 
-      } catch (e) {
+      } catch (e: any) {
+        console.error(
+          'Save Provider Profile Error:',
+          e
+        );
+
         Alert.alert(
           'Database Error ❌',
-          e.message
+          e?.message ||
+            'Profile save nahi ho payi.'
         );
       }
     };
+
+
 
 
   // ==========================================================
@@ -2290,16 +2745,21 @@ export function AppProvider({
             cloudUri
           );
 
-          if (authPhone) {
+          const currentUid =
+            auth.currentUser?.uid || '';
+
+          if (currentUid) {
             await setDoc(
               doc(
                 db,
                 'users',
-                authPhone
+                currentUid
               ),
               {
                 profileUri:
                   cloudUri,
+                updatedAt:
+                  new Date(),
               },
               {
                 merge: true,
@@ -2952,6 +3412,7 @@ export function AppProvider({
 
       // Google Auth
       handleGoogleSignIn,
+      syncMasterUserProfile,
       showGoogleOnboarding,
       pendingGoogleUser,
       completeGoogleProfile,
