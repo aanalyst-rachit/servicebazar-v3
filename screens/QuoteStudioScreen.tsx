@@ -13,9 +13,16 @@ import {
   View,
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-
-// Paste your Google Gemini API Key here
-const GEMINI_API_KEY = 'AQ.Ab8RN6Ic6DIghbbP4LB-AkS7XLdXuCJnilEuTMWG41luNBe3rQ';
+import {
+  getRandomQuote,
+  type QuoteCategory as DatabaseQuoteCategory,
+  type QuoteLanguage,
+} from '../services/quoteDatabase';
+import {
+  getRandomPremiumQuote,
+  type PremiumQuoteItem,
+  type PremiumQuoteType,
+} from '../services/premiumQuoteDatabase';
 
 type QuoteCategory =
   | 'Motivational'
@@ -24,7 +31,7 @@ type QuoteCategory =
   | 'Life'
   | 'Religious';
 
-type LanguageOption = 'Hindi' | 'English' | 'Hinglish' | 'Marathi' | 'Gujarati' | 'Urdu';
+type LanguageOption = 'Hindi' | 'English' | 'Hinglish' | 'Urdu';
 
 interface ThemeOption {
   id: string;
@@ -47,8 +54,6 @@ const LANGUAGES: LanguageOption[] = [
   'Hindi',
   'English',
   'Hinglish',
-  'Marathi',
-  'Gujarati',
   'Urdu',
 ];
 
@@ -121,6 +126,7 @@ export default function QuoteStudioScreen({
   phone = '',
 }: QuoteStudioProps) {
   const quoteCardRef = useRef<View>(null);
+  const premiumQuoteCardRef = useRef<View>(null);
 
   const [category, setCategory] = useState<QuoteCategory>('Religious');
   const [language, setLanguage] = useState<LanguageOption>('Hindi');
@@ -128,91 +134,77 @@ export default function QuoteStudioScreen({
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedTheme, setSelectedTheme] = useState<ThemeOption>(CARD_THEMES[1]);
 
-  // Enhanced Prompt & Category Aware Gemini AI Function
-  const fetchAIQuote = async (selectedCat: QuoteCategory, selectedLang: LanguageOption) => {
-    setLoading(true);
+  // Premium spiritual quote state
+  const [premiumSource, setPremiumSource] =
+    useState<PremiumQuoteType>('Bhagavad Gita');
+  const [premiumQuote, setPremiumQuote] =
+    useState<PremiumQuoteItem | null>(null);
+  const [premiumLoading, setPremiumLoading] = useState<boolean>(false);
+
+  // Local quote database
+  const generateLocalQuote = (
+    selectedCat: QuoteCategory,
+    selectedLang: LanguageOption,
+  ) => {
     try {
-      const timestamp = Date.now();
-      const randomSeed = Math.floor(Math.random() * 999999);
+      setLoading(true);
 
-      // Category Specific Prompt Boost
-      let categoryPromptDetails = `Category: ${selectedCat}.`;
-      if (selectedCat === 'Religious') {
-        categoryPromptDetails = `Category: Religious / Spiritual / Devotional / Bhagavad Gita / Faith in God. Make sure it is deeply spiritual and religious.`;
-      }
-
-      // Language Rules
-      let langInstruction = `Language: ${selectedLang}.`;
-      if (selectedLang === 'English') {
-        langInstruction = 'Language: English (Latin script only).';
-      } else if (selectedLang === 'Hinglish') {
-        langInstruction = 'Language: Hinglish (Hindi words using English/Latin alphabets).';
-      } else if (selectedLang === 'Hindi') {
-        langInstruction = 'Language: Hindi (Strictly in Devanagari script).';
-      } else if (selectedLang === 'Marathi') {
-        langInstruction = 'Language: Marathi (Devanagari script).';
-      } else if (selectedLang === 'Gujarati') {
-        langInstruction = 'Language: Gujarati (Gujarati script).';
-      } else if (selectedLang === 'Urdu') {
-        langInstruction = 'Language: Urdu (Urdu Nastaliq / Perso-Arabic script).';
-      }
-
-      const promptText = `Generate a single short, inspirational, 1-line quote.
-${categoryPromptDetails}
-${langInstruction}
-Unique ID: ${timestamp}-${randomSeed}
-
-Rule: Output ONLY the raw quote text. Do NOT add quotes, context, commentary, or intro text.`;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: promptText }],
-              },
-            ],
-            generationConfig: {
-              temperature: 1.0,
-              topP: 0.95,
-            },
-          }),
-        }
+      const newQuote = getRandomQuote(
+        selectedLang as QuoteLanguage,
+        selectedCat as DatabaseQuoteCategory,
       );
 
-      const data = await response.json();
-
-      if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        const rawText = data.candidates[0].content.parts[0].text;
-        const cleanedText = rawText
-          .trim()
-          .replace(/^["'«“]|["'»”]$/g, '')
-          .replace(/\n/g, ' ');
-
-        setQuote(cleanedText);
-      } else {
-        console.warn('Invalid API response structure:', data);
-      }
+      setQuote(newQuote);
     } catch (error) {
-      console.error('Gemini API Fetch Error:', error);
+      console.error('Local quote generation failed:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  const generatePremiumQuote = (source: PremiumQuoteType) => {
+    try {
+      setPremiumLoading(true);
+      setPremiumSource(source);
+
+      const newPremiumQuote = getRandomPremiumQuote(source);
+      setPremiumQuote(newPremiumQuote);
+    } catch (error) {
+      console.error('Premium quote generation failed:', error);
+    } finally {
+      setPremiumLoading(false);
+    }
+  };
+
+  const sharePremiumQuote = async () => {
+    try {
+      if (!premiumQuoteCardRef.current) return;
+
+      const uri = await captureRef(premiumQuoteCardRef, {
+        format: 'png',
+        quality: 1,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+
+      if (!canShare) return;
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share Premium Quote',
+        UTI: 'public.png',
+      });
+    } catch (error) {
+      console.error('Premium quote sharing failed:', error);
+    }
+  };
+
   const changeCategory = (nextCategory: QuoteCategory) => {
     setCategory(nextCategory);
-    fetchAIQuote(nextCategory, language);
   };
 
   const changeLanguage = (nextLang: LanguageOption) => {
     setLanguage(nextLang);
-    fetchAIQuote(category, nextLang);
   };
 
   const shareQuote = async () => {
@@ -248,7 +240,7 @@ Rule: Output ONLY the raw quote text. Do NOT add quotes, context, commentary, or
         <View style={styles.headerText}>
           <Text style={styles.title}>Quote Studio AI</Text>
           <Text style={styles.subtitle}>
-            Create modern & stylized AI quotes
+            Create modern & stylized quotes
           </Text>
         </View>
       </View>
@@ -446,16 +438,16 @@ Rule: Output ONLY the raw quote text. Do NOT add quotes, context, commentary, or
           </LinearGradient>
         </View>
 
-        {/* Action Buttons */}
+        {/* Normal Quote Actions */}
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={loading}
-          onPress={() => fetchAIQuote(category, language)}
+          onPress={() => generateLocalQuote(category, language)}
           style={[styles.generateButton, loading && styles.buttonDisabled]}
         >
           <Ionicons name="sparkles" size={19} color="#ffffff" />
           <Text style={styles.generateButtonText}>
-            {loading ? 'Generating...' : 'Generate New AI Quote'}
+            {loading ? 'Generating...' : 'Generate New Quote'}
           </Text>
         </TouchableOpacity>
 
@@ -467,6 +459,452 @@ Rule: Output ONLY the raw quote text. Do NOT add quotes, context, commentary, or
           <Ionicons name="share-social-outline" size={19} color="#4f46e5" />
           <Text style={styles.shareButtonText}>Share Quote</Text>
         </TouchableOpacity>
+
+        {/* Premium Quote Studio */}
+        <View
+          style={{
+            marginTop: 28,
+            marginBottom: 4,
+          }}
+        >
+          {/* Premium Section Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 14,
+            }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#fff8df',
+                borderWidth: 1,
+                borderColor: '#d4af37',
+              }}
+            >
+              <Ionicons name="diamond" size={21} color="#b8860b" />
+            </View>
+
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text
+                style={{
+                  color: '#111827',
+                  fontSize: 19,
+                  fontWeight: '900',
+                }}
+              >
+                Premium Quote Studio
+              </Text>
+
+              <Text
+                style={{
+                  color: '#9a7b16',
+                  fontSize: 11,
+                  fontWeight: '800',
+                  marginTop: 3,
+                  letterSpacing: 0.5,
+                }}
+              >
+                SACRED • EXCLUSIVE • PREMIUM
+              </Text>
+            </View>
+
+            <View
+              style={{
+                paddingHorizontal: 9,
+                paddingVertical: 6,
+                borderRadius: 10,
+                backgroundColor: '#fff8df',
+                borderWidth: 1,
+                borderColor: '#d4af37',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#9a7b16',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PREMIUM
+              </Text>
+            </View>
+          </View>
+
+          {/* Premium Source Selector - App UI Only */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            {(['Bhagavad Gita', 'Quran'] as PremiumQuoteType[]).map(
+              (source) => {
+                const selected = premiumSource === source;
+
+                return (
+                  <TouchableOpacity
+                    key={source}
+                    activeOpacity={0.85}
+                    onPress={() => setPremiumSource(source)}
+                    style={{
+                      flex: 1,
+                      minHeight: 48,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: selected ? '#d4af37' : '#ffffff',
+                      borderWidth: 1,
+                      borderColor: selected ? '#d4af37' : '#e2e8f0',
+                      elevation: selected ? 3 : 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selected ? '#111827' : '#475569',
+                        fontSize: 12,
+                        fontWeight: '900',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {source === 'Bhagavad Gita'
+                        ? '🕉️ Bhagavad Gita'
+                        : '☪️ Quran'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+
+          {/* PREMIUM CARD ONLY - THIS IS SHARED */}
+          <View
+            ref={premiumQuoteCardRef}
+            collapsable={false}
+            style={{
+              borderRadius: 26,
+              overflow: 'hidden',
+              elevation: 12,
+              shadowColor: '#8a6d1d',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.25,
+              shadowRadius: 18,
+            }}
+          >
+            <LinearGradient
+              colors={['#211a0b', '#3a2b0d', '#111827']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                minHeight: 330,
+                padding: 24,
+                justifyContent: 'space-between',
+              }}
+            >
+              {/* Premium Decorative Elements */}
+              <View
+                style={{
+                  position: 'absolute',
+                  width: 180,
+                  height: 180,
+                  borderRadius: 90,
+                  right: -75,
+                  top: -75,
+                  borderWidth: 28,
+                  borderColor: 'rgba(212,175,55,0.12)',
+                }}
+              />
+
+              <View
+                style={{
+                  position: 'absolute',
+                  width: 130,
+                  height: 130,
+                  borderRadius: 65,
+                  left: -55,
+                  bottom: -55,
+                  backgroundColor: 'rgba(212,175,55,0.08)',
+                }}
+              />
+
+              <View
+                style={{
+                  width: 52,
+                  height: 4,
+                  borderRadius: 4,
+                  backgroundColor: '#d4af37',
+                  marginBottom: 18,
+                }}
+              />
+
+              {/* User Profile */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                {profileUri ? (
+                  <Image
+                    source={{ uri: profileUri }}
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 32,
+                      borderWidth: 2.5,
+                      borderColor: '#f5d76e',
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 32,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#2a2110',
+                      borderWidth: 2.5,
+                      borderColor: '#f5d76e',
+                    }}
+                  >
+                    <Ionicons name="person" size={29} color="#f5d76e" />
+                  </View>
+                )}
+
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 17,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {ownerName || 'Pro2'}
+                  </Text>
+
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: '#f5d76e',
+                      fontSize: 13,
+                      fontWeight: '800',
+                      marginTop: 3,
+                    }}
+                  >
+                    {shopName || 'Pro2 ki dukan'}
+                  </Text>
+
+                  {!!providerCategory && (
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: '#cbd5e1',
+                        fontSize: 11,
+                        fontWeight: '600',
+                        marginTop: 3,
+                      }}
+                    >
+                      {providerCategory}
+                      {subcategory ? ` • ${subcategory}` : ''}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: 'rgba(245,215,110,0.25)',
+                  marginVertical: 18,
+                }}
+              />
+
+              {/* Quote */}
+              <View
+                style={{
+                  flex: 1,
+                  minHeight: 145,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                }}
+              >
+                {premiumLoading ? (
+                  <>
+                    <ActivityIndicator size="large" color="#f5d76e" />
+                    <Text
+                      style={{
+                        color: '#cbd5e1',
+                        marginTop: 12,
+                        fontSize: 12,
+                        fontWeight: '600',
+                      }}
+                    >
+                      Preparing sacred quote...
+                    </Text>
+                  </>
+                ) : premiumQuote ? (
+                  <>
+                    <Text
+                      style={{
+                        color: '#d4af37',
+                        fontSize: 11,
+                        fontWeight: '900',
+                        textAlign: 'center',
+                        marginBottom: 6,
+                        letterSpacing: 0.7,
+                      }}
+                    >
+                      {premiumQuote.reference}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: '#fffdf2',
+                        fontSize: 19,
+                        lineHeight: 31,
+                        fontWeight: '700',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {premiumQuote.text}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons
+                      name="sparkles-outline"
+                      size={38}
+                      color="#d4af37"
+                    />
+
+                    <Text
+                      style={{
+                        color: '#f5d76e',
+                        fontSize: 17,
+                        fontWeight: '900',
+                        textAlign: 'center',
+                        marginTop: 10,
+                      }}
+                    >
+                      {premiumSource === 'Bhagavad Gita'
+                        ? 'Sacred Wisdom'
+                        : 'Sacred Guidance'}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: '#94a3b8',
+                        fontSize: 12,
+                        textAlign: 'center',
+                        lineHeight: 19,
+                        marginTop: 6,
+                      }}
+                    >
+                      Generate your premium spiritual quote.
+                    </Text>
+                  </>
+                )}
+              </View>
+
+              {/* Premium Branding */}
+              <View
+                style={{
+                  alignItems: 'center',
+                  marginTop: 18,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#d4af37',
+                    fontSize: 10,
+                    fontWeight: '900',
+                    letterSpacing: 2,
+                  }}
+                >
+                  SERVICEBAZAR PREMIUM
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        </View>
+
+        {/* Premium Actions */}
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          disabled={premiumLoading}
+          onPress={() => generatePremiumQuote(premiumSource)}
+          style={{
+            minHeight: 50,
+            marginTop: 2,
+            borderRadius: 15,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            backgroundColor: '#d4af37',
+            opacity: premiumLoading ? 0.65 : 1,
+          }}
+        >
+          <Ionicons name="sparkles" size={18} color="#111827" />
+
+          <Text
+            style={{
+              color: '#111827',
+              fontSize: 14,
+              fontWeight: '900',
+              marginLeft: 8,
+            }}
+          >
+            {premiumLoading
+              ? 'Generating...'
+              : 'Generate Premium Quote'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={sharePremiumQuote}
+          style={{
+            minHeight: 48,
+            marginTop: 10,
+            marginBottom: 12,
+            borderRadius: 15,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: '#d4af37',
+          }}
+        >
+          <Ionicons
+            name="share-social-outline"
+            size={18}
+            color="#9a7b16"
+          />
+
+          <Text
+            style={{
+              color: '#7c6213',
+              fontSize: 14,
+              fontWeight: '900',
+              marginLeft: 8,
+            }}
+          >
+            Share Premium Quote
+          </Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </View>
   );
