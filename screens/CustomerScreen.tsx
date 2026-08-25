@@ -5,8 +5,9 @@ import QuoteStudioScreen from '@/screens/QuoteStudioScreen';
 import { styles } from '@/styles/appStyles';
 import { calculateDistance } from '@/utils/distance';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Location from 'expo-location';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 export default function CustomerScreen() {
   const {
     customerActiveTab,
@@ -57,6 +58,11 @@ export default function CustomerScreen() {
 
     authName,
     authPhone,
+    address,
+    setAddress,
+    region,
+    setRegion,
+    syncMasterUserProfile,
 
     pickImage,
     handleLogout,
@@ -67,6 +73,188 @@ export default function CustomerScreen() {
   // ============================================================
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // ============================================================
+  // CUSTOMER EDIT PROFILE
+  // ============================================================
+
+  const [editProfileVisible, setEditProfileVisible] =
+    useState(false);
+
+  const [editProfileName, setEditProfileName] =
+    useState('');
+
+  const [editProfilePhone, setEditProfilePhone] =
+    useState('');
+
+  const [editProfileAddress, setEditProfileAddress] =
+    useState('');
+
+  const [editProfileLocation, setEditProfileLocation] =
+    useState<{
+      latitude: number;
+      longitude: number;
+    } | null>(null);
+
+  const [editProfileSaving, setEditProfileSaving] =
+    useState(false);
+
+  const [editProfileLocationLoading, setEditProfileLocationLoading] =
+    useState(false);
+
+  const openCustomerEditProfile = () => {
+    setEditProfileName(authName || '');
+    setEditProfilePhone(authPhone || '');
+    setEditProfileAddress(address || '');
+    setEditProfileLocation(
+      region?.latitude && region?.longitude
+        ? {
+            latitude: region.latitude,
+            longitude: region.longitude,
+          }
+        : null
+    );
+
+    setDrawerOpen(false);
+    setEditProfileVisible(true);
+  };
+
+  const useCustomerCurrentLocation = async () => {
+    try {
+      setEditProfileLocationLoading(true);
+
+      const permission =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          'Location Permission',
+          'Current location use karne ke liye location permission allow karein.'
+        );
+        return;
+      }
+
+      const current =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+      const coords = {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      };
+
+      setEditProfileLocation(coords);
+
+      try {
+        const addresses =
+          await Location.reverseGeocodeAsync(coords);
+
+        if (addresses?.[0]) {
+          const a = addresses[0];
+
+          const parts = [
+            a.name,
+            a.street,
+            a.district,
+            a.city,
+            a.region,
+            a.postalCode,
+          ].filter(Boolean);
+
+          if (parts.length) {
+            setEditProfileAddress(parts.join(', '));
+          }
+        }
+      } catch (geoError) {
+        console.log(
+          'Customer reverse geocoding skipped:',
+          geoError
+        );
+      }
+    } catch (error: any) {
+      console.error(
+        'Customer Current Location Error:',
+        error
+      );
+
+      Alert.alert(
+        'Location Error',
+        error?.message ||
+          'Current location nahi mil payi.'
+      );
+    } finally {
+      setEditProfileLocationLoading(false);
+    }
+  };
+
+  const saveCustomerEditProfile = async () => {
+    if (!editProfileName.trim()) {
+      Alert.alert(
+        'Required',
+        'Please apna naam enter karein.'
+      );
+      return;
+    }
+
+    if (!editProfilePhone.trim()) {
+      Alert.alert(
+        'Required',
+        'Please phone number enter karein.'
+      );
+      return;
+    }
+
+    try {
+      setEditProfileSaving(true);
+
+      const savedLocation =
+        editProfileLocation ||
+        (region?.latitude && region?.longitude
+          ? {
+              latitude: region.latitude,
+              longitude: region.longitude,
+            }
+          : null);
+
+      await syncMasterUserProfile({
+        name: editProfileName.trim(),
+        phone: editProfilePhone.trim(),
+        address: editProfileAddress.trim(),
+        location: savedLocation,
+        profileUri: customerProfileUri || null,
+      });
+
+      setAddress(editProfileAddress.trim());
+
+      if (savedLocation) {
+        setRegion((prev: any) => ({
+          ...prev,
+          ...savedLocation,
+        }));
+      }
+
+      setEditProfileVisible(false);
+
+      Alert.alert(
+        'Profile Updated ✓',
+        'Customer profile successfully save ho gaya.'
+      );
+    } catch (error: any) {
+      console.error(
+        'Customer profile save error:',
+        error
+      );
+
+      Alert.alert(
+        'Save Error',
+        error?.message ||
+          'Profile save nahi ho paya.'
+      );
+    } finally {
+      setEditProfileSaving(false);
+    }
+  };
 
   // ============================================================
   // TYPES
@@ -1873,11 +2061,7 @@ export default function CustomerScreen() {
 
               <TouchableOpacity
                 activeOpacity={0.75}
-                onPress={() => {
-                  pickImage(
-                    'customer_profile'
-                  );
-                }}
+                onPress={openCustomerEditProfile}
                 style={{
                   minHeight: 55,
                   borderRadius: 14,
@@ -2074,6 +2258,401 @@ export default function CustomerScreen() {
           />
         </View>
       </Modal>
+
+      {/* ==================================================
+          CUSTOMER EDIT PROFILE
+          ================================================== */}
+
+      <Modal
+        visible={editProfileVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() =>
+          setEditProfileVisible(false)
+        }
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15,23,42,0.45)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#f8fafc',
+              borderTopLeftRadius: 26,
+              borderTopRightRadius: 26,
+              maxHeight: '92%',
+              paddingHorizontal: 20,
+              paddingTop: 18,
+              paddingBottom: 28,
+            }}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* HEADER */}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 20,
+                }}
+              >
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      fontWeight: '800',
+                      color: '#0f172a',
+                    }}
+                  >
+                    Edit Profile
+                  </Text>
+
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      color: '#64748b',
+                    }}
+                  >
+                    Apni profile details update karein
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setEditProfileVisible(false)
+                  }
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: '#e2e8f0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="close"
+                    size={22}
+                    color="#475569"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* PROFILE PHOTO */}
+
+              <View
+                style={{
+                  alignItems: 'center',
+                  marginBottom: 22,
+                }}
+              >
+                <View
+                  style={{
+                    width: 92,
+                    height: 92,
+                    borderRadius: 46,
+                    backgroundColor: '#e0e7ff',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    borderWidth: 3,
+                    borderColor: '#c7d2fe',
+                  }}
+                >
+                  {customerProfileUri ? (
+                    <Image
+                      source={{
+                        uri: customerProfileUri,
+                      }}
+                      style={{
+                        width: 92,
+                        height: 92,
+                      }}
+                    />
+                  ) : (
+                    <Text
+                      style={{
+                        color: '#4f46e5',
+                        fontSize: 32,
+                        fontWeight: '800',
+                      }}
+                    >
+                      {authName
+                        ? authName
+                            .charAt(0)
+                            .toUpperCase()
+                        : 'C'}
+                    </Text>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    pickImage('customer_profile')
+                  }
+                  style={{
+                    marginTop: 10,
+                    paddingHorizontal: 15,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    backgroundColor: '#eef2ff',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={17}
+                    color="#4f46e5"
+                  />
+
+                  <Text
+                    style={{
+                      marginLeft: 6,
+                      color: '#3730a3',
+                      fontWeight: '700',
+                    }}
+                  >
+                    Change Photo
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* NAME */}
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#334155',
+                  marginBottom: 7,
+                }}
+              >
+                Full Name
+              </Text>
+
+              <TextInput
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#cbd5e1',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 13,
+                  fontSize: 15,
+                  color: '#111827',
+                  marginBottom: 16,
+                }}
+                placeholder="Your full name"
+                value={editProfileName}
+                onChangeText={setEditProfileName}
+              />
+
+              {/* PHONE */}
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#334155',
+                  marginBottom: 7,
+                }}
+              >
+                Phone Number
+              </Text>
+
+              <TextInput
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#cbd5e1',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 13,
+                  fontSize: 15,
+                  color: '#111827',
+                  marginBottom: 16,
+                }}
+                placeholder="9876543210"
+                keyboardType="phone-pad"
+                value={editProfilePhone}
+                onChangeText={setEditProfilePhone}
+              />
+
+              {/* ADDRESS */}
+
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#334155',
+                  marginBottom: 7,
+                }}
+              >
+                Address
+              </Text>
+
+              <TextInput
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#cbd5e1',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 13,
+                  fontSize: 15,
+                  color: '#111827',
+                  minHeight: 82,
+                  textAlignVertical: 'top',
+                  marginBottom: 12,
+                }}
+                placeholder="House / Street / Area"
+                multiline
+                value={editProfileAddress}
+                onChangeText={setEditProfileAddress}
+              />
+
+              {/* CURRENT LOCATION */}
+
+              <TouchableOpacity
+                onPress={useCustomerCurrentLocation}
+                disabled={editProfileLocationLoading}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#c7d2fe',
+                  borderRadius: 12,
+                  paddingVertical: 13,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  marginBottom: 12,
+                }}
+              >
+                {editProfileLocationLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#4f46e5"
+                  />
+                ) : (
+                  <Ionicons
+                    name="locate-outline"
+                    size={20}
+                    color="#4f46e5"
+                  />
+                )}
+
+                <Text
+                  style={{
+                    marginLeft: 8,
+                    color: '#3730a3',
+                    fontWeight: '700',
+                  }}
+                >
+                  {editProfileLocationLoading
+                    ? 'Getting Current Location...'
+                    : 'Use Current Location'}
+                </Text>
+              </TouchableOpacity>
+
+              {editProfileLocation && (
+                <View
+                  style={{
+                    backgroundColor: '#eef2ff',
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    marginBottom: 18,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#4338ca',
+                      fontSize: 11,
+                      fontWeight: '600',
+                    }}
+                  >
+                    📍 GPS: {editProfileLocation.latitude.toFixed(6)},{' '}
+                    {editProfileLocation.longitude.toFixed(6)}
+                  </Text>
+                </View>
+              )}
+
+              {/* ACTIONS */}
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: 10,
+                  marginTop: 4,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() =>
+                    setEditProfileVisible(false)
+                  }
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    alignItems: 'center',
+                    backgroundColor: '#e2e8f0',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#475569',
+                      fontWeight: '800',
+                    }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={saveCustomerEditProfile}
+                  style={{
+                    flex: 1.4,
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    alignItems: 'center',
+                    backgroundColor: '#4f46e5',
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="save-outline"
+                    size={18}
+                    color="#ffffff"
+                  />
+
+                  <Text
+                    style={{
+                      marginLeft: 7,
+                      color: '#ffffff',
+                      fontWeight: '800',
+                    }}
+                  >
+                    Save Profile
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ height: 10 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }

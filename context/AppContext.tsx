@@ -853,7 +853,9 @@ export function AppProvider({
         }
 
         const location =
-          await Location.getCurrentPositionAsync({});
+          await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
 
         setUserLocation({
           latitude: location.coords.latitude,
