@@ -18,6 +18,7 @@ import {
   type QuoteCategory as DatabaseQuoteCategory,
   type QuoteLanguage,
 } from '../services/quoteDatabase';
+import PremiumScriptureArtwork from '../pro_themes/artwork/PremiumScriptureArtwork';
 import {
   getRandomPremiumQuote,
   type PremiumQuoteItem,
@@ -682,6 +683,14 @@ export default function QuoteStudioScreen({
                 justifyContent: 'space-between',
               }}
             >
+              {/* Premium Religious Vector Artwork */}
+              <PremiumScriptureArtwork
+                scripture={premiumSource}
+                color={selectedProTheme.vector.topShape}
+                glow={selectedProTheme.vector.glow}
+                opacity={0.16}
+              />
+
               {/* Premium Decorative Vector Artwork */}
 
               {/* Large outer ring */}
