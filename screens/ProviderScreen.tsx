@@ -1,14 +1,17 @@
+import { useEffect, useRef } from 'react';
 import AutoProviderBanner from '@/components/AutoProviderBanner';
-import OSMMap from '@/components/OSMMap';
 import SocialFeed from '@/components/SocialFeed';
+import Svg, { Circle, Path, Line, Polygon } from 'react-native-svg';
 import { useApp } from '@/context/AppContext';
 import QuoteStudioScreen from '@/screens/QuoteStudioScreen';
 import { styles } from '@/styles/appStyles';
 import { formatTime } from '@/utils/time';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import { useState } from 'react';
 import {
+  Animated,
   ActivityIndicator, Image, Modal,
   ScrollView,
   Text,
@@ -87,9 +90,6 @@ export default function ProviderScreen() {
     address,
     setAddress,
 
-    searchAddressOnMap,
-    loadingMap,
-
     region,
     setRegion,
 
@@ -140,6 +140,50 @@ export default function ProviderScreen() {
 
   const [drawerOpen, setDrawerOpen] =
     useState(false);
+
+  const drawerArtPulse = useRef(new Animated.Value(0)).current;
+  const drawerArtFloat = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drawerArtPulse, {
+          toValue: 1,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(drawerArtPulse, {
+          toValue: 0,
+          duration: 2600,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const float = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drawerArtFloat, {
+          toValue: 1,
+          duration: 3200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(drawerArtFloat, {
+          toValue: 0,
+          duration: 3200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulse.start();
+    float.start();
+
+    return () => {
+      pulse.stop();
+      float.stop();
+    };
+  }, [drawerArtPulse, drawerArtFloat]);
+
 
   const currentTab =
     activeTab || 'profile';
@@ -214,6 +258,49 @@ export default function ProviderScreen() {
           : currentTab === 'bookings'
             ? 'calendar-outline'
             : 'document-text-outline';
+
+  const useCurrentGpsLocation = async () => {
+    try {
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        alert('Location permission is required to use your current location.');
+        return;
+      }
+
+      const currentLocation =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+      const latitude = currentLocation.coords.latitude;
+      const longitude = currentLocation.coords.longitude;
+
+      const newRegion = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      };
+
+      setRegion(newRegion);
+
+      await fetchAddressFromCoords(
+        latitude,
+        longitude
+      );
+    } catch (error) {
+      console.log(
+        'Provider GPS location error:',
+        error
+      );
+
+      alert(
+        'Current location fetch nahi ho saki. GPS/location permission check karein.'
+      );
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -805,19 +892,40 @@ export default function ProviderScreen() {
                     },
                   ]}
                 >
-                  📍 Shop Location Map
+                  📍 Shop Location
                 </Text>
 
                 <View
-                  style={
-                    styles.mapBox
-                  }
+                  style={{
+                    marginTop: 4,
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                  }}
                 >
-                  <OSMMap
-                    latitude={region.latitude}
-                    longitude={region.longitude}
-                  />
-                  </View>
+                  <Text
+                    style={{
+                      color: '#64748b',
+                      fontSize: 12,
+                      fontWeight: '700',
+                    }}
+                  >
+                    GPS coordinates saved
+                  </Text>
+
+                  <Text
+                    style={{
+                      marginTop: 5,
+                      color: '#334155',
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {region.latitude.toFixed(6)}, {region.longitude.toFixed(6)}
+                  </Text>
+                </View>
               </View>
             ) : (
               <View>
@@ -1113,54 +1221,74 @@ export default function ProviderScreen() {
                 />
 
                 <TouchableOpacity
-                  style={styles.searchBtn}
-                  onPress={
-                    searchAddressOnMap
-                  }
+                  style={[
+                    styles.searchBtn,
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    },
+                  ]}
+                  onPress={useCurrentGpsLocation}
+                  activeOpacity={0.85}
                 >
-                  {loadingMap ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text
-                      style={
-                        styles.searchBtnText
-                      }
-                    >
-                      🔍 Search Address
-                      On Map
-                    </Text>
-                  )}
+                  <Ionicons
+                    name="navigate"
+                    size={18}
+                    color="#fff"
+                  />
+
+                  <Text
+                    style={
+                      styles.searchBtnText
+                    }
+                  >
+                    Use Current GPS Location
+                  </Text>
                 </TouchableOpacity>
 
                 <View
-                  style={
-                    styles.mapBox
-                  }
+                  style={{
+                    marginTop: 10,
+                    marginBottom: 18,
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                  }}
                 >
-                  <OSMMap
-                    latitude={region.latitude}
-                    longitude={region.longitude}
-                    draggable
-                    onLocationChange={(
-                      latitude,
-                      longitude
-                    ) => {
-                      const newCoords = {
-                        latitude,
-                        longitude,
-                      };
-
-                      setRegion((prev: Region) => ({
-                        ...prev,
-                        ...newCoords,
-                      }));
-
-                      fetchAddressFromCoords(
-                        latitude,
-                        longitude
-                      );
+                  <Text
+                    style={{
+                      color: '#64748b',
+                      fontSize: 12,
+                      fontWeight: '700',
                     }}
-                  />
+                  >
+                    📍 Current saved coordinates
+                  </Text>
+
+                  <Text
+                    style={{
+                      marginTop: 5,
+                      color: '#334155',
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {region.latitude.toFixed(6)}, {region.longitude.toFixed(6)}
+                  </Text>
+
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      color: '#94a3b8',
+                      fontSize: 11,
+                    }}
+                  >
+                    GPS location use karke address automatically update ho jayega.
+                  </Text>
                 </View>
 
                 <View
@@ -2515,6 +2643,130 @@ export default function ProviderScreen() {
               </TouchableOpacity>
             </ScrollView>
 
+{/* ==================================================
+                DRAWER PREMIUM VECTOR ART
+                ================================================== */}
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 330,
+                opacity: drawerArtPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.55, 0.78],
+                }),
+                transform: [
+                  {
+                    translateY: drawerArtFloat.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -10],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 400 330"
+              >
+                {/* soft ambient circles */}
+                <Circle
+                  cx="55"
+                  cy="275"
+                  r="105"
+                  fill="#6366f1"
+                  opacity="0.07"
+                />
+                <Circle
+                  cx="355"
+                  cy="235"
+                  r="125"
+                  fill="#8b5cf6"
+                  opacity="0.055"
+                />
+                <Circle
+                  cx="205"
+                  cy="300"
+                  r="72"
+                  fill="#4f46e5"
+                  opacity="0.035"
+                />
+
+                {/* elegant flowing line */}
+                <Path
+                  d="M-20 255 C65 195 105 315 185 245 C260 180 315 245 420 165"
+                  fill="none"
+                  stroke="#6366f1"
+                  strokeWidth="1.5"
+                  opacity="0.20"
+                />
+
+                <Path
+                  d="M-20 285 C70 220 125 335 210 270 C290 210 340 275 420 205"
+                  fill="none"
+                  stroke="#8b5cf6"
+                  strokeWidth="1"
+                  opacity="0.13"
+                />
+
+                {/* geometric triangle */}
+                <Polygon
+                  points="315,275 365,190 405,285"
+                  fill="none"
+                  stroke="#6366f1"
+                  strokeWidth="1.2"
+                  opacity="0.16"
+                />
+
+                {/* small floating nodes */}
+                <Circle
+                  cx="82"
+                  cy="220"
+                  r="4"
+                  fill="#6366f1"
+                  opacity="0.20"
+                />
+                <Circle
+                  cx="275"
+                  cy="245"
+                  r="3"
+                  fill="#8b5cf6"
+                  opacity="0.22"
+                />
+                <Circle
+                  cx="335"
+                  cy="160"
+                  r="3"
+                  fill="#6366f1"
+                  opacity="0.18"
+                />
+
+                {/* subtle vertical geometry */}
+                <Line
+                  x1="82"
+                  y1="220"
+                  x2="125"
+                  y2="285"
+                  stroke="#6366f1"
+                  strokeWidth="1"
+                  opacity="0.10"
+                />
+                <Line
+                  x1="275"
+                  y1="245"
+                  x2="315"
+                  y2="275"
+                  stroke="#8b5cf6"
+                  strokeWidth="1"
+                  opacity="0.10"
+                />
+              </Svg>
+            </Animated.View>
+
             {/* DRAWER FOOTER */}
 
             <View
@@ -2558,3 +2810,5 @@ export default function ProviderScreen() {
     </View>
   );
 }
+
+
