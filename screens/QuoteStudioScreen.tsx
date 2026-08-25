@@ -23,6 +23,11 @@ import {
   type PremiumQuoteItem,
   type PremiumQuoteType,
 } from '../services/premiumQuoteDatabase';
+import {
+  PRO_THEMES,
+  DEFAULT_PRO_THEME,
+  type ProTheme,
+} from '../pro_themes/themes';
 
 type QuoteCategory =
   | 'Motivational'
@@ -140,6 +145,8 @@ export default function QuoteStudioScreen({
   const [premiumQuote, setPremiumQuote] =
     useState<PremiumQuoteItem | null>(null);
   const [premiumLoading, setPremiumLoading] = useState<boolean>(false);
+  const [selectedProTheme, setSelectedProTheme] =
+    useState<ProTheme>(DEFAULT_PRO_THEME);
 
   // Local quote database
   const generateLocalQuote = (
@@ -484,7 +491,7 @@ export default function QuoteStudioScreen({
                 justifyContent: 'center',
                 backgroundColor: '#fff8df',
                 borderWidth: 1,
-                borderColor: '#d4af37',
+                borderColor: selectedProTheme.colors.primary,
               }}
             >
               <Ionicons name="diamond" size={21} color="#b8860b" />
@@ -521,7 +528,7 @@ export default function QuoteStudioScreen({
                 borderRadius: 10,
                 backgroundColor: '#fff8df',
                 borderWidth: 1,
-                borderColor: '#d4af37',
+                borderColor: selectedProTheme.colors.primary,
               }}
             >
               <Text
@@ -535,6 +542,74 @@ export default function QuoteStudioScreen({
               </Text>
             </View>
           </View>
+
+          {/* Premium Theme Selector - App UI Only */}
+          <Text
+            style={{
+              paddingHorizontal: 18,
+              paddingTop: 18,
+              marginBottom: 10,
+              color: '#475569',
+              fontSize: 13,
+              fontWeight: '900',
+            }}
+          >
+            Choose Premium Theme
+          </Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 18,
+              paddingBottom: 14,
+              gap: 10,
+            }}
+          >
+            {PRO_THEMES.map((theme) => {
+              const selected = selectedProTheme.id === theme.id;
+
+              return (
+                <TouchableOpacity
+                  key={theme.id}
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedProTheme(theme)}
+                  style={{
+                    minWidth: 112,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 15,
+                    alignItems: 'center',
+                    backgroundColor: selected
+                      ? theme.colors.accentSoft
+                      : '#ffffff',
+                    borderWidth: 1,
+                    borderColor: selected
+                      ? theme.colors.primary
+                      : '#e2e8f0',
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>
+                    {theme.icon}
+                  </Text>
+
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      marginTop: 5,
+                      color: selected
+                        ? theme.colors.primary
+                        : '#475569',
+                      fontSize: 10,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {theme.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
           {/* Premium Source Selector - App UI Only */}
           <View
@@ -598,7 +673,7 @@ export default function QuoteStudioScreen({
             }}
           >
             <LinearGradient
-              colors={['#211a0b', '#3a2b0d', '#111827']}
+              colors={selectedProTheme.colors.gradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
@@ -607,39 +682,127 @@ export default function QuoteStudioScreen({
                 justifyContent: 'space-between',
               }}
             >
-              {/* Premium Decorative Elements */}
+              {/* Premium Decorative Vector Artwork */}
+
+              {/* Large outer ring */}
               <View
+                pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  width: 180,
-                  height: 180,
-                  borderRadius: 90,
+                  width: 210,
+                  height: 210,
+                  borderRadius: 105,
+                  right: -105,
+                  top: -105,
+                  borderWidth: 2,
+                  borderColor: selectedProTheme.vector.topShape,
+                  opacity: 0.28,
+                }}
+              />
+
+              {/* Inner luxury ring */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  width: 150,
+                  height: 150,
+                  borderRadius: 75,
                   right: -75,
                   top: -75,
-                  borderWidth: 28,
-                  borderColor: 'rgba(212,175,55,0.12)',
+                  borderWidth: 14,
+                  borderColor: selectedProTheme.vector.topShape,
+                  opacity: 0.12,
                 }}
               />
 
+              {/* Glow core */}
               <View
+                pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  width: 130,
-                  height: 130,
-                  borderRadius: 65,
-                  left: -55,
-                  bottom: -55,
-                  backgroundColor: 'rgba(212,175,55,0.08)',
+                  width: 90,
+                  height: 90,
+                  borderRadius: 45,
+                  right: -45,
+                  top: -45,
+                  backgroundColor: selectedProTheme.vector.glow,
+                  opacity: 0.08,
                 }}
               />
 
+              {/* Bottom ornamental ring */}
               <View
+                pointerEvents="none"
                 style={{
-                  width: 52,
+                  position: 'absolute',
+                  width: 170,
+                  height: 170,
+                  borderRadius: 85,
+                  left: -90,
+                  bottom: -90,
+                  borderWidth: 18,
+                  borderColor: selectedProTheme.vector.bottomShape,
+                  opacity: 0.16,
+                }}
+              />
+
+              {/* Bottom inner ring */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  width: 105,
+                  height: 105,
+                  borderRadius: 53,
+                  left: -52,
+                  bottom: -52,
+                  borderWidth: 2,
+                  borderColor: selectedProTheme.vector.glow,
+                  opacity: 0.24,
+                }}
+              />
+
+              {/* Premium diagonal accent */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  width: 110,
+                  height: 2,
+                  right: -18,
+                  top: 72,
+                  backgroundColor: selectedProTheme.vector.line,
+                  opacity: 0.35,
+                  transform: [{ rotate: '-35deg' }],
+                }}
+              />
+
+              {/* Secondary diagonal accent */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  width: 70,
+                  height: 1,
+                  right: 8,
+                  top: 92,
+                  backgroundColor: selectedProTheme.vector.glow,
+                  opacity: 0.28,
+                  transform: [{ rotate: '-35deg' }],
+                }}
+              />
+
+              {/* Premium top accent */}
+              <View
+                pointerEvents="none"
+                style={{
+                  width: 58,
                   height: 4,
                   borderRadius: 4,
-                  backgroundColor: '#d4af37',
+                  backgroundColor: selectedProTheme.vector.line,
                   marginBottom: 18,
+                  opacity: 0.95,
                 }}
               />
 
@@ -658,7 +821,7 @@ export default function QuoteStudioScreen({
                       height: 64,
                       borderRadius: 32,
                       borderWidth: 2.5,
-                      borderColor: '#f5d76e',
+                      borderColor: selectedProTheme.vector.glow,
                     }}
                   />
                 ) : (
@@ -669,12 +832,12 @@ export default function QuoteStudioScreen({
                       borderRadius: 32,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: '#2a2110',
+                      backgroundColor: selectedProTheme.colors.accentSoft,
                       borderWidth: 2.5,
-                      borderColor: '#f5d76e',
+                      borderColor: selectedProTheme.vector.glow,
                     }}
                   >
-                    <Ionicons name="person" size={29} color="#f5d76e" />
+                    <Ionicons name="person" size={29} color={selectedProTheme.vector.glow} />
                   </View>
                 )}
 
@@ -682,7 +845,7 @@ export default function QuoteStudioScreen({
                   <Text
                     numberOfLines={1}
                     style={{
-                      color: '#ffffff',
+                      color: selectedProTheme.colors.text,
                       fontSize: 17,
                       fontWeight: '900',
                     }}
@@ -693,7 +856,7 @@ export default function QuoteStudioScreen({
                   <Text
                     numberOfLines={1}
                     style={{
-                      color: '#f5d76e',
+                      color: selectedProTheme.colors.secondary,
                       fontSize: 13,
                       fontWeight: '800',
                       marginTop: 3,
@@ -706,7 +869,7 @@ export default function QuoteStudioScreen({
                     <Text
                       numberOfLines={1}
                       style={{
-                        color: '#cbd5e1',
+                        color: selectedProTheme.colors.subText,
                         fontSize: 11,
                         fontWeight: '600',
                         marginTop: 3,
@@ -740,10 +903,10 @@ export default function QuoteStudioScreen({
               >
                 {premiumLoading ? (
                   <>
-                    <ActivityIndicator size="large" color="#f5d76e" />
+                    <ActivityIndicator size="large" color={selectedProTheme.vector.glow} />
                     <Text
                       style={{
-                        color: '#cbd5e1',
+                        color: selectedProTheme.colors.subText,
                         marginTop: 12,
                         fontSize: 12,
                         fontWeight: '600',
@@ -756,7 +919,7 @@ export default function QuoteStudioScreen({
                   <>
                     <Text
                       style={{
-                        color: '#d4af37',
+                        color: selectedProTheme.colors.primary,
                         fontSize: 11,
                         fontWeight: '900',
                         textAlign: 'center',
@@ -789,7 +952,7 @@ export default function QuoteStudioScreen({
 
                     <Text
                       style={{
-                        color: '#f5d76e',
+                        color: selectedProTheme.colors.secondary,
                         fontSize: 17,
                         fontWeight: '900',
                         textAlign: 'center',
@@ -803,7 +966,7 @@ export default function QuoteStudioScreen({
 
                     <Text
                       style={{
-                        color: '#94a3b8',
+                        color: selectedProTheme.colors.subText,
                         fontSize: 12,
                         textAlign: 'center',
                         lineHeight: 19,
@@ -825,7 +988,7 @@ export default function QuoteStudioScreen({
               >
                 <Text
                   style={{
-                    color: '#d4af37',
+                    color: selectedProTheme.colors.primary,
                     fontSize: 10,
                     fontWeight: '900',
                     letterSpacing: 2,
@@ -851,7 +1014,7 @@ export default function QuoteStudioScreen({
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
-            backgroundColor: '#d4af37',
+            backgroundColor: selectedProTheme.vector.line,
             opacity: premiumLoading ? 0.65 : 1,
           }}
         >
