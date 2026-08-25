@@ -496,6 +496,7 @@ export default function CustomerScreen() {
         />
         ) : currentTab === 'quote' ? (
           <QuoteStudioScreen
+            profileUri={customerProfileUri}
             ownerName={authName}
             phone={authPhone}
           />
@@ -1744,8 +1745,8 @@ export default function CustomerScreen() {
 
           <View
             style={{
-              width: '82%',
-              maxWidth: 340,
+              width: '100%',
+              maxWidth: 380,
               backgroundColor: '#ffffff',
               flex: 1,
               shadowColor: '#000000',
@@ -1929,10 +1930,14 @@ export default function CustomerScreen() {
                       <View
                         style={{
                           flex: 1,
+                          minWidth: 0,
+                          flexShrink: 1,
                           marginLeft: 12,
+                          marginRight: 8,
                         }}
                       >
                         <Text
+                          numberOfLines={1}
                           style={{
                             fontSize: 14,
                             fontWeight:
@@ -1972,6 +1977,8 @@ export default function CustomerScreen() {
                             style={{
                               minWidth: 23,
                               height: 23,
+                              flexShrink: 0,
+                              marginLeft: 4,
                               paddingHorizontal: 6,
                               borderRadius: 12,
                               backgroundColor:
