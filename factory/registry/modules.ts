@@ -3,8 +3,19 @@ import QuoteStudioScreen from '@/screens/QuoteStudioScreen';
 import QRMakerScreen from '@/screens/QRMakerScreen';
 import GSTCalculatorScreen from '@/screens/GSTCalculatorScreen';
 import InvoiceMakerScreen from '@/screens/InvoiceMakerScreen';
+import CoachingTeacherRegistrationScreen from '@/factory/coaching-studio/screens/CoachingTeacherRegistrationScreen';
 
 export const FACTORY_MODULES: FactoryModule[] = [
+  {
+    id: 'coaching-studio',
+    title: 'Coaching Studio',
+    subtitle: 'Build and manage your coaching profile',
+    icon: 'school-outline',
+    category: 'Education',
+    price: 'Free',
+    component: CoachingTeacherRegistrationScreen,
+  },
+
   {
     id: 'quote-maker',
     title: 'Quote Maker',
