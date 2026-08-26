@@ -9,6 +9,8 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useApp } from '@/context/AppContext';
+import CoachingLiveClassScreen from './CoachingLiveClassScreen';
+import CoachingTeacherRegistrationScreen from './CoachingTeacherRegistrationScreen';
 
 type MenuItem = {
   id: string;
@@ -66,12 +68,36 @@ export default function CoachingStudioHomeScreen() {
   const teacherName = ownerName || authName || 'Teacher';
   const coachingName = shopName || 'Coaching Studio';
 
+  const [activeScreen, setActiveScreen] = React.useState<
+    'home' | 'profile' | 'live-class'
+  >('home');
+
   const handleMenuPress = (item: MenuItem) => {
+    if (item.id === 'profile') {
+      setActiveScreen('profile');
+      return;
+    }
+
+    if (item.id === 'live-class') {
+      setActiveScreen('live-class');
+      return;
+    }
+
     console.log(
       'COACHING STUDIO MENU:',
       item.id
     );
   };
+
+  if (activeScreen === 'profile') {
+    return <CoachingTeacherRegistrationScreen />;
+  }
+
+  if (activeScreen === 'live-class') {
+    return (
+      <CoachingLiveClassScreen />
+    );
+  }
 
   return (
     <View style={styles.container}>
