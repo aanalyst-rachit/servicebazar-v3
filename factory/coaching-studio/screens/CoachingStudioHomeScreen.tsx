@@ -1,0 +1,304 @@
+import React from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { useApp } from '@/context/AppContext';
+
+type MenuItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+};
+
+const MENU_ITEMS: MenuItem[] = [
+  {
+    id: 'profile',
+    title: 'Profile',
+    subtitle: 'Manage your coaching and teacher profile',
+    icon: 'person-circle-outline',
+  },
+  {
+    id: 'live-class',
+    title: 'Live Class',
+    subtitle: 'Start and manage live classes',
+    icon: 'videocam-outline',
+  },
+  {
+    id: 'recorded-class',
+    title: 'Recorded Class',
+    subtitle: 'Manage your recorded lectures',
+    icon: 'play-circle-outline',
+  },
+  {
+    id: 'study-material',
+    title: 'Study Material',
+    subtitle: 'Share notes, PDFs and learning material',
+    icon: 'book-outline',
+  },
+  {
+    id: 'notifications',
+    title: 'Notifications',
+    subtitle: 'Send and manage student notifications',
+    icon: 'notifications-outline',
+  },
+  {
+    id: 'others',
+    title: 'Others',
+    subtitle: 'More coaching management options',
+    icon: 'ellipsis-horizontal-circle-outline',
+  },
+];
+
+export default function CoachingStudioHomeScreen() {
+  const {
+    ownerName,
+    authName,
+    shopName,
+  } = useApp();
+
+  const teacherName = ownerName || authName || 'Teacher';
+  const coachingName = shopName || 'Coaching Studio';
+
+  const handleMenuPress = (item: MenuItem) => {
+    console.log(
+      'COACHING STUDIO MENU:',
+      item.id
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="school-outline"
+              size={30}
+              color="#ffffff"
+            />
+          </View>
+
+          <View style={styles.headerText}>
+            <Text style={styles.title}>
+              Coaching Studio
+            </Text>
+
+            <Text style={styles.subtitle}>
+              {coachingName}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.welcomeCard}>
+          <Text style={styles.welcomeLabel}>
+            Welcome
+          </Text>
+
+          <Text style={styles.teacherName}>
+            {teacherName}
+          </Text>
+
+          <Text style={styles.welcomeText}>
+            Manage your coaching activities from one place.
+          </Text>
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          Coaching Studio
+        </Text>
+
+        <View style={styles.menuContainer}>
+          {MENU_ITEMS.map((item, index) => (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.82}
+              onPress={() => handleMenuPress(item)}
+              style={styles.menuCard}
+            >
+              <View style={styles.menuNumber}>
+                <Text style={styles.menuNumberText}>
+                  {index + 1}
+                </Text>
+              </View>
+
+              <View style={styles.menuIcon}>
+                <Ionicons
+                  name={item.icon}
+                  size={30}
+                  color="#2563eb"
+                />
+              </View>
+
+              <View style={styles.menuInfo}>
+                <Text style={styles.menuTitle}>
+                  {item.title}
+                </Text>
+
+                <Text style={styles.menuSubtitle}>
+                  {item.subtitle}
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={22}
+                color="#94a3b8"
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+
+  content: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  headerIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 17,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  headerText: {
+    flex: 1,
+    marginLeft: 14,
+  },
+
+  title: {
+    fontSize: 23,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  subtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  welcomeCard: {
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 24,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  welcomeLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  teacherName: {
+    marginTop: 5,
+    fontSize: 21,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  welcomeText: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#64748b',
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 12,
+  },
+
+  menuContainer: {
+    gap: 12,
+  },
+
+  menuCard: {
+    minHeight: 88,
+    borderRadius: 17,
+    paddingHorizontal: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  menuNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+  },
+
+  menuNumberText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  menuIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 15,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  menuInfo: {
+    flex: 1,
+    marginLeft: 13,
+    marginRight: 8,
+  },
+
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  menuSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#64748b',
+  },
+});
