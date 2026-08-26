@@ -3,7 +3,7 @@ import QuoteStudioScreen from '@/screens/QuoteStudioScreen';
 import QRMakerScreen from '@/screens/QRMakerScreen';
 import GSTCalculatorScreen from '@/screens/GSTCalculatorScreen';
 import InvoiceMakerScreen from '@/screens/InvoiceMakerScreen';
-import CoachingTeacherRegistrationScreen from '@/factory/coaching-studio/screens/CoachingTeacherRegistrationScreen';
+import CoachingStudioScreen from '@/factory/coaching-studio/screens/CoachingStudioScreen';
 
 export const FACTORY_MODULES: FactoryModule[] = [
   {
@@ -13,7 +13,7 @@ export const FACTORY_MODULES: FactoryModule[] = [
     icon: 'school-outline',
     category: 'Education',
     price: 'Free',
-    component: CoachingTeacherRegistrationScreen,
+    component: CoachingStudioScreen,
   },
 
   {
