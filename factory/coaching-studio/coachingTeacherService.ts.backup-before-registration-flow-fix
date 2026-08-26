@@ -25,16 +25,10 @@ export async function saveCoachingTeacherProfile(
     profile.serviceBazarUid
   );
 
-  const cleanProfile = Object.fromEntries(
-    Object.entries(profile).filter(
-      ([, value]) => value !== undefined
-    )
-  );
-
   await setDoc(
     profileRef,
     {
-      ...cleanProfile,
+      ...profile,
       updatedAt: serverTimestamp(),
       createdAt:
         profile.createdAt || serverTimestamp(),

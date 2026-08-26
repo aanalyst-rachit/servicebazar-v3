@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Keyboard,
   StyleSheet,
   Text,
@@ -49,6 +50,19 @@ export default function CoachingLiveClassScreen() {
     () => videoId || 'empty',
     [videoId]
   );
+
+  React.useEffect(() => {
+    const handleBackPress = () => {
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBackPress
+    );
+
+    return () => subscription.remove();
+  }, []);
 
   const connectClass = async () => {
     Keyboard.dismiss();

@@ -12,7 +12,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useApp } from '@/context/AppContext';
 import {
-  getCoachingTeacherProfile,
   saveCoachingTeacherProfile,
 } from '@/factory/coaching-studio/coachingTeacherService';
 import {
@@ -22,13 +21,7 @@ import {
   COACHING_TEACHING_MODES,
 } from '@/factory/coaching-studio';
 
-type Props = {
-  onRegistered?: () => void;
-};
-
-export default function CoachingTeacherRegistrationScreen({
-  onRegistered,
-}: Props) {
+export default function CoachingTeacherRegistrationScreen() {
   const {
     authName,
     authPhone,
@@ -50,8 +43,6 @@ export default function CoachingTeacherRegistrationScreen({
   const [experience, setExperience] = useState('');
   const [qualification, setQualification] = useState('');
   const [bio, setBio] = useState('');
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
 
   const teacherName = useMemo(
     () => ownerName || authName || '',
@@ -67,59 +58,6 @@ export default function CoachingTeacherRegistrationScreen({
     () => mobileNumber || authPhone || '',
     [mobileNumber, authPhone]
   );
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    const loadExistingProfile = async () => {
-      if (!firebaseUid) {
-        return;
-      }
-
-      try {
-        setLoadingProfile(true);
-
-        const existing =
-          await getCoachingTeacherProfile(firebaseUid);
-
-        if (!mounted || !existing) {
-          return;
-        }
-
-        setSelectedSubjects(existing.subjects || []);
-        setSelectedClasses(existing.classes || []);
-        setBoard(existing.board || '');
-        setTeachingMode(
-          existing.teachingMode || 'offline'
-        );
-        setExperience(
-          existing.experienceYears !== undefined
-            ? String(existing.experienceYears)
-            : ''
-        );
-        setQualification(
-          existing.qualification || ''
-        );
-        setBio(existing.bio || '');
-        setIsEditing(false);
-      } catch (error) {
-        console.error(
-          'COACHING PROFILE LOAD ERROR:',
-          error
-        );
-      } finally {
-        if (mounted) {
-          setLoadingProfile(false);
-        }
-      }
-    };
-
-    loadExistingProfile();
-
-    return () => {
-      mounted = false;
-    };
-  }, [firebaseUid]);
 
   const toggleItem = (
     value: string,
@@ -180,31 +118,19 @@ export default function CoachingTeacherRegistrationScreen({
       coachingName: businessName,
       subjects: selectedSubjects,
       classes: selectedClasses,
-      ...(board.trim()
-        ? { board: board.trim() }
-        : {}),
-
+      board: board || undefined,
       teachingMode,
 
-      ...(experience.trim()
-        ? {
-            experienceYears: Number(experience),
-          }
-        : {}),
+      experienceYears: experience
+        ? Number(experience)
+        : undefined,
 
-      ...(qualification.trim()
-        ? {
-            qualification: qualification.trim(),
-          }
-        : {}),
+      qualification:
+        qualification.trim() || undefined,
 
-      ...(bio.trim()
-        ? {
-            bio: bio.trim(),
-          }
-        : {}),
+      bio: bio.trim() || undefined,
 
-      registrationCompleted: true,
+      registrationCompleted: false,
     };
 
     try {
@@ -212,11 +138,10 @@ export default function CoachingTeacherRegistrationScreen({
         teacherProfile
       );
 
-      if (isEditing) {
-        setIsEditing(false);
-      } else {
-        onRegistered?.();
-      }
+      Alert.alert(
+        'Saved Successfully',
+        'Your Coaching Studio teacher profile has been saved.'
+      );
     } catch (error) {
       console.error(
         'COACHING TEACHER SAVE ERROR:',
@@ -301,15 +226,13 @@ export default function CoachingTeacherRegistrationScreen({
                 key={subject}
                 label={subject}
                 selected={selected}
-                onPress={() => {
-                  if (!isEditing) return;
-
+                onPress={() =>
                   toggleItem(
                     subject,
                     selectedSubjects,
                     setSelectedSubjects
-                  );
-                }}
+                  )
+                }
               />
             );
           })}
@@ -326,15 +249,13 @@ export default function CoachingTeacherRegistrationScreen({
                 key={className}
                 label={className}
                 selected={selected}
-                onPress={() => {
-                  if (!isEditing) return;
-
+                onPress={() =>
                   toggleItem(
                     className,
                     selectedClasses,
                     setSelectedClasses
-                  );
-                }}
+                  )
+                }
               />
             );
           })}
@@ -350,10 +271,7 @@ export default function CoachingTeacherRegistrationScreen({
                 key={item}
                 label={item}
                 selected={selected}
-                onPress={() => {
-                  if (!isEditing) return;
-                  setBoard(item);
-                }}
+                onPress={() => setBoard(item)}
               />
             );
           })}
@@ -370,10 +288,9 @@ export default function CoachingTeacherRegistrationScreen({
                 key={mode.id}
                 label={mode.label}
                 selected={selected}
-                onPress={() => {
-                  if (!isEditing) return;
-                  setTeachingMode(mode.id);
-                }}
+                onPress={() =>
+                  setTeachingMode(mode.id)
+                }
               />
             );
           })}
@@ -386,14 +303,10 @@ export default function CoachingTeacherRegistrationScreen({
         <TextInput
           value={experience}
           onChangeText={setExperience}
-          editable={isEditing}
           placeholder="e.g. 5"
           placeholderTextColor="#94a3b8"
           keyboardType="numeric"
-          style={[
-            styles.input,
-            !isEditing && styles.readOnlyInput,
-          ]}
+          style={styles.input}
         />
 
         <Text style={styles.label}>
@@ -403,13 +316,9 @@ export default function CoachingTeacherRegistrationScreen({
         <TextInput
           value={qualification}
           onChangeText={setQualification}
-          editable={isEditing}
           placeholder="e.g. M.Sc Mathematics, B.Ed"
           placeholderTextColor="#94a3b8"
-          style={[
-            styles.input,
-            !isEditing && styles.readOnlyInput,
-          ]}
+          style={styles.input}
         />
 
         <Text style={styles.label}>
@@ -419,7 +328,6 @@ export default function CoachingTeacherRegistrationScreen({
         <TextInput
           value={bio}
           onChangeText={setBio}
-          editable={isEditing}
           placeholder="Tell students about your teaching experience..."
           placeholderTextColor="#94a3b8"
           multiline
@@ -427,36 +335,20 @@ export default function CoachingTeacherRegistrationScreen({
           style={[
             styles.input,
             styles.bioInput,
-            !isEditing && styles.readOnlyInput,
           ]}
         />
 
         <TouchableOpacity
           style={styles.continueButton}
           activeOpacity={0.85}
-          onPress={() => {
-            if (loadingProfile) return;
-
-            if (!isEditing && onRegistered) {
-              setIsEditing(true);
-              return;
-            }
-
-            handleContinue();
-          }}
+          onPress={handleContinue}
         >
           <Text style={styles.continueText}>
-            {isEditing
-              ? 'Save Profile'
-              : 'Edit Profile'}
+            Continue Registration
           </Text>
 
           <Ionicons
-            name={
-              isEditing
-                ? 'checkmark'
-                : 'create-outline'
-            }
+            name="arrow-forward"
             size={20}
             color="#ffffff"
           />
@@ -672,12 +564,6 @@ const styles = StyleSheet.create({
   bioInput: {
     minHeight: 120,
     paddingTop: 14,
-  },
-
-  readOnlyInput: {
-    backgroundColor: '#f1f5f9',
-    borderColor: '#e2e8f0',
-    color: '#475569',
   },
 
   continueButton: {

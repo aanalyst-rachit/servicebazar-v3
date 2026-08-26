@@ -109,11 +109,7 @@ export default function CoachingStudioHomeScreen() {
   };
 
   if (activeScreen === 'profile') {
-    return (
-      <CoachingTeacherRegistrationScreen
-        onRegistered={() => setActiveScreen('home')}
-      />
-    );
+    return <CoachingTeacherRegistrationScreen />;
   }
 
   if (activeScreen === 'live-class') {

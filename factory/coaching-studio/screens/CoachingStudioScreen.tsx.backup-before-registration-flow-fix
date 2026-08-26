@@ -74,11 +74,7 @@ export default function CoachingStudioScreen() {
     return <CoachingStudioHomeScreen />;
   }
 
-  return (
-    <CoachingTeacherRegistrationScreen
-      onRegistered={() => setIsRegistered(true)}
-    />
-  );
+  return <CoachingTeacherRegistrationScreen />;
 }
 
 const styles = StyleSheet.create({
