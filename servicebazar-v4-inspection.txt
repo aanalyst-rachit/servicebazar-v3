@@ -1,0 +1,189 @@
+===== PROJECT INFO =====
+/home/racit/Desktop/curser project/servicebazar-v3
+
+===== PACKAGE.JSON =====
+{
+  "name": "servicebazar-v3",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "dependencies": {
+    "@expo/ui": "~57.0.12",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "9.1.0",
+    "@react-native-google-signin/google-signin": "^16.1.4",
+    "expo": "~57.0.15",
+    "expo-constants": "~57.0.13",
+    "expo-dev-client": "~57.0.14",
+    "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.5",
+    "expo-font": "~57.0.1",
+    "expo-glass-effect": "~57.0.1",
+    "expo-image": "~57.0.3",
+    "expo-image-picker": "~57.0.12",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-linking": "~57.0.7",
+    "expo-location": "~57.0.12",
+    "expo-print": "~57.0.1",
+    "expo-router": "~57.0.15",
+    "expo-sharing": "~57.0.15",
+    "expo-splash-screen": "~57.0.7",
+    "expo-status-bar": "~57.0.1",
+    "expo-symbols": "~57.0.2",
+    "expo-system-ui": "~57.0.2",
+    "expo-video": "~57.0.2",
+    "expo-web-browser": "~57.0.2",
+    "firebase": "^12.18.0",
+    "qrcode": "^1.5.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.2",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-view-shot": "5.1.0",
+    "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "private": true
+}
+
+===== APP STRUCTURE =====
+app/index.tsx
+app/_layout.tsx
+
+===== SRC STRUCTURE =====
+
+===== COMPONENTS =====
+components/AutoProviderBanner.tsx
+components/FactoryBackground.tsx
+components/FactoryModuleCard.tsx
+components/modals/AdminEditModal.tsx
+components/modals/BookingModal.tsx
+components/modals/CatalogPickerModal.tsx
+components/modals/RatingModal.tsx
+components/modals/ShopImagesModal.tsx
+components/PremiumScriptureStudio.tsx
+components/SocialFeed.tsx
+components/useClientOnlyValue.ts
+components/useClientOnlyValue.web.ts
+
+===== SERVICES =====
+services/cloudinary.ts
+services/cloudinary.ts.v2fix.bak
+services/firebase.ts
+services/firebase.ts.before-restore.bak
+services/firebase.ts.v2fix.bak
+services/geocoding.ts
+services/overpass.ts
+services/premiumQuoteDatabase.ts
+services/quoteDatabase.ts
+services/quoteDatabase.ts.backup-premium
+services/storage.ts
+services/storage.ts.v2fix.bak
+
+===== LIB =====
+
+===== CONTEXT =====
+context/AppContext.tsx
+
+===== FACTORY / MANAGER SEARCH =====
+components/FactoryBackground.tsx:5:export default function FactoryBackground() {
+components/FactoryModuleCard.tsx:10:import type { FactoryModule } from '@/factory/types/moduleTypes';
+components/FactoryModuleCard.tsx:13:  module: FactoryModule;
+components/FactoryModuleCard.tsx:17:export default function FactoryModuleCard({
+components/SocialFeed.tsx:62:type FeedRole = 'customer' | 'provider' | 'owner' | string;
+components/SocialFeed.tsx:72:  authorRole: FeedRole;
+components/SocialFeed.tsx:96:  userRole?: FeedRole;
+components/SocialFeed.tsx:138:const safeRoleLabel = (role?: string) => {
+components/SocialFeed.tsx:139:  if (role === 'provider' || role === 'owner') return 'Owner';
+components/SocialFeed.tsx:145:  userRole = 'customer',
+components/SocialFeed.tsx:194:    userRole === 'provider' || userRole === 'owner';
+components/SocialFeed.tsx:337:        authorRole: userRole || 'customer',
+components/SocialFeed.tsx:804:      item.authorRole === 'provider' ||
+components/SocialFeed.tsx:805:      item.authorRole === 'owner';
+components/SocialFeed.tsx:833:              <View style={styles.roleBadge}>
+components/SocialFeed.tsx:836:                    styles.roleBadgeText
+components/SocialFeed.tsx:839:                  {safeRoleLabel(
+components/SocialFeed.tsx:840:                    item.authorRole
+components/SocialFeed.tsx:1237:                    userRole ===
+components/SocialFeed.tsx:1239:                    userRole === 'owner'
+components/SocialFeed.tsx:1259:                    styles.composerRole
+components/SocialFeed.tsx:1262:                  {safeRoleLabel(
+components/SocialFeed.tsx:1263:                    userRole
+components/SocialFeed.tsx:1851:  roleBadge: {
+components/SocialFeed.tsx:1858:  roleBadgeText: {
+components/SocialFeed.tsx:2020:  composerRole: {
+context/AppContext.tsx:146:  const [userRole, setUserRole] = useState(null);
+context/AppContext.tsx:152:  const [selectedSignupRole, setSelectedSignupRole] =
+context/AppContext.tsx:179:  // FACTORY NAVIGATION
+context/AppContext.tsx:182:  const [factoryOpen, setFactoryOpen] = useState(false);
+context/AppContext.tsx:494:          setUserRole('');
+context/AppContext.tsx:664:          setUserRole('');
+context/AppContext.tsx:720:        setUserRole(
+context/AppContext.tsx:721:          u.role || ''
+context/AppContext.tsx:749:          u.role === 'provider'
+context/AppContext.tsx:832:    if (userRole === 'admin') {
+context/AppContext.tsx:835:  }, [userRole]);
+context/AppContext.tsx:934:            setUserRole(parsed.role || '');
+context/AppContext.tsx:999:        const effectiveRole =
+context/AppContext.tsx:1002:            : selectedSignupRole;
+context/AppContext.tsx:1022:            existingData.role !==
+context/AppContext.tsx:1023:            selectedSignupRole
+context/AppContext.tsx:1026:              'Role Conflict 🛑',
+context/AppContext.tsx:1027:              `Yeh mobile number (${cleanPhone}) pehle se as a "${existingData.role.toUpperCase()}" registered hai!`
+context/AppContext.tsx:1047:            role: effectiveRole,
+context/AppContext.tsx:1065:            role: effectiveRole,
+context/AppContext.tsx:1076:          role: effectiveRole,
+context/AppContext.tsx:1087:        setUserRole(effectiveRole);
+context/AppContext.tsx:1184:          const role =
+context/AppContext.tsx:1185:            existing.role || 'customer';
+context/AppContext.tsx:1191:            role,
+context/AppContext.tsx:1201:          setUserRole(role);
+context/AppContext.tsx:1240:        setUserRole('');
+context/AppContext.tsx:1334:        const role =
+context/AppContext.tsx:1353:          role,
+context/AppContext.tsx:1359:            role === 'provider'
+context/AppContext.tsx:1363:            role === 'provider'
+context/AppContext.tsx:1367:            role === 'provider'
+context/AppContext.tsx:1391:          role === 'provider' &&
+context/AppContext.tsx:1426:              role: 'provider',
+context/AppContext.tsx:1444:              role,
+context/AppContext.tsx:1463:        setUserRole(role);
+context/AppContext.tsx:1551:        setUserRole(null);
+context/AppContext.tsx:1644:      role:
+context/AppContext.tsx:1645:        updates.role ??
+context/AppContext.tsx:1646:        existingMaster.role ??
+context/AppContext.tsx:1647:        userRole ??
+context/AppContext.tsx:1713:      masterProfile.role &&
+context/AppContext.tsx:1714:      masterProfile.role !== userRole
+context/AppContext.tsx:1716:      setUserRole(
+context/AppContext.tsx:1717:        masterProfile.role
+context/AppContext.tsx:1825:          role:
+context/AppContext.tsx:1944:        setUserRole(
+context/AppContext.tsx:2839:        userRole !== 'admin'
+context/AppContext.tsx:3172:      userRole !==
+context/AppContext.tsx:3260:    userRole,
+context/AppContext.tsx:3398:      userRole,
+context/AppContext.tsx:3400:      setUserRole,
+context/AppContext.tsx:3405:      selectedSignupRole,
+context/AppContext.tsx:3406:      setSelectedSignupRole,
+context/AppContext.tsx:3424:      // Factory
+context/AppContext.tsx:3425:      factoryOpen,
+context/AppContext.tsx:3426:      setFactoryOpen,

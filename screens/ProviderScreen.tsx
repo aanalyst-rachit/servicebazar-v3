@@ -57,6 +57,7 @@ export default function ProviderScreen() {
 
     activeTab,
     setActiveTab,
+    setFactoryOpen,
 
     providerUpcoming,
 
@@ -195,6 +196,12 @@ export default function ProviderScreen() {
   const navigateFromDrawer = (
     tab: string
   ) => {
+    if (tab === 'factory') {
+      setFactoryOpen(true);
+      setDrawerOpen(false);
+      return;
+    }
+
     setActiveTab(tab as any);
 
     setDrawerOpen(false);
@@ -234,6 +241,13 @@ export default function ProviderScreen() {
       title: 'Quote Studio',
       subtitle: 'Create & Share Quotes',
       icon: 'document-text-outline' as const,
+    },
+
+    {
+      key: 'factory',
+      title: 'Factory',
+      subtitle: 'Build Your Own Tools',
+      icon: 'construct-outline' as const,
     },
   ];
 

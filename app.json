@@ -8,12 +8,13 @@
     "scheme": "servicebazarv3",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.rachitkanaujia.servicebazarv3"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/images/servicebazar-adaptive-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -47,8 +48,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6253e08f-8553-43b9-abe0-b6116e530ca1"
+        "projectId": "1e932550-f013-4f0b-a323-2b4dedf56b1f"
       }
-    }
+    },
+    "owner": "rkk091"
   }
 }

@@ -8,6 +8,7 @@ import AdminScreen from '@/screens/AdminScreen';
 import AuthScreen from '@/screens/AuthScreen';
 import CustomerScreen from '@/screens/CustomerScreen';
 import ProviderScreen from '@/screens/ProviderScreen';
+import FactoryScreen from '@/screens/FactoryScreen';
 import NewUserProfileScreen from '@/screens/NewUserProfileScreen';
 import { styles } from '@/styles/appStyles';
 import React from 'react';
@@ -19,6 +20,7 @@ export default function ServiceBazarRoot() {
     isDataLoaded,
     userRole,
     showGoogleOnboarding,
+    factoryOpen,
   } = useApp();
 
   if (!isDataLoaded) {
@@ -32,8 +34,13 @@ export default function ServiceBazarRoot() {
 
   return (
     <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
-          {showGoogleOnboarding ? (
+        <SafeAreaView
+          style={styles.container}
+          edges={['top', 'bottom']}
+        >
+          {factoryOpen ? (
+            <FactoryScreen />
+          ) : showGoogleOnboarding ? (
             <NewUserProfileScreen />
           ) : !userRole ? (
             <AuthScreen />

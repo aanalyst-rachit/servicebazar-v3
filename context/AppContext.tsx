@@ -175,6 +175,12 @@ export function AppProvider({
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // ==========================================================
+  // FACTORY NAVIGATION
+  // ==========================================================
+
+  const [factoryOpen, setFactoryOpen] = useState(false);
+
   const slideAnim = useRef(
     new Animated.Value(-SCREEN_WIDTH * 0.8)
   ).current;
@@ -1421,20 +1427,6 @@ export function AppProvider({
               authProvider: 'google',
               updatedAt: new Date(),
             },
-            { merge: true }
-          );
-        }
-
-        // Keep legacy email-based Google record for
-        // backward compatibility with existing app data.
-        if (pendingGoogleUser.email) {
-          await setDoc(
-            doc(
-              db,
-              'users',
-              pendingGoogleUser.email
-            ),
-            profile,
             { merge: true }
           );
         }
@@ -3404,6 +3396,7 @@ export function AppProvider({
       // Auth
       isDataLoaded,
       userRole,
+      firebaseUid,
       setUserRole,
       authName,
       setAuthName,
@@ -3427,6 +3420,10 @@ export function AppProvider({
       // Drawer
       isDrawerOpen,
       slideAnim,
+
+      // Factory
+      factoryOpen,
+      setFactoryOpen,
 
       // Customer
       customerProfileUri,

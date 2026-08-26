@@ -688,7 +688,7 @@ export default function QuoteStudioScreen({
                 scripture={premiumSource}
                 color={selectedProTheme.vector.topShape}
                 glow={selectedProTheme.vector.glow}
-                opacity={0.16}
+                opacity={0.20}
               />
 
               {/* Premium Decorative Vector Artwork */}

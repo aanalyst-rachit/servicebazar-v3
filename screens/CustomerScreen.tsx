@@ -15,6 +15,7 @@ export default function CustomerScreen() {
   const {
     customerActiveTab,
     setCustomerActiveTab,
+    setFactoryOpen,
 
     customerSubTab,
     setCustomerSubTab,
@@ -358,6 +359,12 @@ export default function CustomerScreen() {
   const navigateFromDrawer = (
     tab: string
   ) => {
+    if (tab === 'factory') {
+      setFactoryOpen(true);
+      setDrawerOpen(false);
+      return;
+    }
+
     setCustomerActiveTab(tab as any);
 
     setDrawerOpen(false);
@@ -393,6 +400,13 @@ export default function CustomerScreen() {
       title: 'Quote Studio',
       subtitle: 'Create AI Quotes',
       icon: 'sparkles-outline' as const,
+    },
+
+    {
+      key: 'factory',
+      title: 'Factory',
+      subtitle: 'Build Your Own Tools',
+      icon: 'construct-outline' as const,
     },
   ];
 
