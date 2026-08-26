@@ -12,6 +12,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useApp } from '@/context/AppContext';
 import {
+  saveCoachingTeacherProfile,
+} from '@/factory/coaching-studio/coachingTeacherService';
+import {
   COACHING_BOARDS,
   COACHING_CLASS_OPTIONS,
   COACHING_SUBJECT_OPTIONS,
@@ -68,7 +71,7 @@ export default function CoachingTeacherRegistrationScreen() {
     );
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!teacherName.trim()) {
       Alert.alert('Required', 'Teacher name is missing.');
       return;
@@ -89,31 +92,67 @@ export default function CoachingTeacherRegistrationScreen() {
       return;
     }
 
-    console.log('COACHING TEACHER REGISTRATION', {
-      serviceBazarUid: firebaseUid || '',
+    if (!firebaseUid) {
+      Alert.alert(
+        'Unable to Continue',
+        'ServiceBazar user ID is missing.'
+      );
+      return;
+    }
+
+    const teacherProfile = {
+      serviceBazarUid: firebaseUid,
       profileUri: profileUri || null,
+
       name: teacherName,
       businessName,
       phone,
-      address,
-      category,
-      subcategory,
+      email: '',
+
+      address: address || '',
+      category: category || '',
+      subcategory: subcategory || '',
+
+      serviceIds: [],
+
+      coachingName: businessName,
       subjects: selectedSubjects,
       classes: selectedClasses,
-      board,
+      board: board || undefined,
       teachingMode,
+
       experienceYears: experience
         ? Number(experience)
         : undefined,
-      qualification,
-      bio,
-      registrationCompleted: false,
-    });
 
-    Alert.alert(
-      'Form Ready',
-      'Teacher registration data is ready. Database saving will be added in the next step.'
-    );
+      qualification:
+        qualification.trim() || undefined,
+
+      bio: bio.trim() || undefined,
+
+      registrationCompleted: false,
+    };
+
+    try {
+      await saveCoachingTeacherProfile(
+        teacherProfile
+      );
+
+      Alert.alert(
+        'Saved Successfully',
+        'Your Coaching Studio teacher profile has been saved.'
+      );
+    } catch (error) {
+      console.error(
+        'COACHING TEACHER SAVE ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Save Failed',
+        'Unable to save your coaching profile. Please try again.'
+      );
+    }
   };
 
   return (
