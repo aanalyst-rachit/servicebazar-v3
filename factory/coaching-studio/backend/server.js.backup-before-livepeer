@@ -1,0 +1,161 @@
+const http = require('http');
+const { URL } = require('url');
+
+const PORT = Number(process.env.PORT) || 3000;
+const LIVEPEER_API_KEY = process.env.LIVEPEER_API_KEY || 'cbbbc30a-6314-4e6f-bea5-c931b3e50169';
+
+const LIVEPEER_API_BASE = 'https://livepeer.studio/api';
+
+function sendJson(res, status, data) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  });
+
+  res.end(JSON.stringify(data));
+}
+
+async function createLivepeerStream(name) {
+  if (!LIVEPEER_API_KEY) {
+    throw new Error('LIVEPEER_API_KEY is not configured');
+  }
+
+  const response = await fetch(`${LIVEPEER_API_BASE}/stream`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${LIVEPEER_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      profiles: [
+        {
+          name: '720p',
+          width: 1280,
+          height: 720,
+          bitrate: 3000000,
+          fps: 30,
+        },
+        {
+          name: '480p',
+          width: 854,
+          height: 480,
+          bitrate: 1500000,
+          fps: 30,
+        },
+        {
+          name: '360p',
+          width: 640,
+          height: 360,
+          bitrate: 800000,
+          fps: 30,
+        },
+      ],
+    }),
+  });
+
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Livepeer returned non-JSON response (${response.status})`
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+      data?.error ||
+      `Livepeer API returned ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+const server = http.createServer(async (req, res) => {
+  const requestUrl = new URL(
+    req.url || '/',
+    `http://${req.headers.host || 'localhost'}`
+  );
+
+  if (req.method === 'OPTIONS') {
+    return sendJson(res, 204, {});
+  }
+
+  /*
+   * HEALTH CHECK
+   */
+  if (
+    req.method === 'GET' &&
+    requestUrl.pathname === '/api/health'
+  ) {
+    return sendJson(res, 200, {
+      success: true,
+      service: 'servicebazar-coaching-live',
+      livepeerConfigured: Boolean(LIVEPEER_API_KEY),
+    });
+  }
+
+  /*
+   * CREATE LIVEPEER STREAM
+   */
+  if (
+    req.method === 'POST' &&
+    requestUrl.pathname === '/api/livepeer/create-stream'
+  ) {
+    try {
+      const name =
+        (
+          requestUrl.searchParams.get('name') ||
+          'ServiceBazar Premium Live Class'
+        ).trim();
+
+      const stream = await createLivepeerStream(name);
+
+      return sendJson(res, 200, {
+        success: true,
+        stream: {
+          id: stream.id || null,
+          name: stream.name || name,
+          streamKey: stream.streamKey || null,
+          playbackId: stream.playbackId || null,
+          ingestUrl:
+            stream.ingestUrl ||
+            'rtmp://rtmp.livepeer.com/live',
+        },
+      });
+    } catch (error) {
+      console.error(
+        'Livepeer stream creation failed:',
+        error
+      );
+
+      return sendJson(res, 500, {
+        success: false,
+        message: error.message || 'Unable to create Livepeer stream',
+      });
+    }
+  }
+
+  return sendJson(res, 404, {
+    success: false,
+    message: 'Not found',
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(
+    `ServiceBazar Coaching Live backend running on port ${PORT}`
+  );
+
+  console.log(
+    `Livepeer API key configured: ${Boolean(LIVEPEER_API_KEY)}`
+  );
+});

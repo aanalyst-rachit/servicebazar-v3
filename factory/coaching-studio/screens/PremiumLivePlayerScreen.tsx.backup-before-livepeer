@@ -1,0 +1,146 @@
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Video from 'react-native-video';
+
+type Props = {
+  youtubeUrl: string;
+  backendUrl: string;
+};
+
+export default function PremiumLivePlayerScreen({
+  youtubeUrl,
+  backendUrl,
+}: Props) {
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStream = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setStreamUrl(null);
+
+        const endpoint =
+          `${backendUrl}/api/premium-live/stream?url=` +
+          encodeURIComponent(youtubeUrl);
+
+        const response = await fetch(endpoint);
+
+        if (!response.ok) {
+          throw new Error(`Backend returned ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success || !data.streamUrl) {
+          throw new Error(
+            data.message || 'Live stream URL not available'
+          );
+        }
+
+        if (!cancelled) {
+          setStreamUrl(data.streamUrl);
+        }
+      } catch (err) {
+        console.error('Premium Live stream error:', err);
+
+        if (!cancelled) {
+          setError('Unable to load the premium live stream.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadStream();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [youtubeUrl, backendUrl]);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.playerContainer}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" />
+            <Text style={styles.text}>
+              Loading live stream...
+            </Text>
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : streamUrl ? (
+          <Video
+            source={{
+              uri: streamUrl,
+              type: 'm3u8',
+            }}
+            style={styles.video}
+            controls
+            resizeMode="contain"
+            playInBackground={false}
+            playWhenInactive={false}
+            onError={(event) => {
+              console.error(
+                'Premium Live playback error:',
+                event
+              );
+              setError('Unable to play the live stream.');
+            }}
+          />
+        ) : (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>
+              Stream URL not available.
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  playerContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#000',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  text: {
+    marginTop: 10,
+    color: '#fff',
+  },
+  errorText: {
+    color: '#fff',
+    textAlign: 'center',
+  },
+});

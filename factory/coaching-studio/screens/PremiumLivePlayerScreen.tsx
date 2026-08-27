@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,6 +25,7 @@ import {
 
 type Props = {
   backendUrl: string;
+  onBack?: () => void;
 };
 
 type StreamData = {
@@ -38,6 +39,7 @@ type StreamData = {
 
 export default function PremiumLivePlayerScreen({
   backendUrl,
+  onBack,
 }: Props) {
   const { firebaseUid, ownerName, shopName } = useApp();
 
@@ -46,11 +48,6 @@ export default function PremiumLivePlayerScreen({
 
   const [stream, setStream] =
     useState<StreamData | null>(null);
-
-  const [streamUrl, setStreamUrl] =
-    useState<string | null>(null);
-
-  const player = useVideoPlayer(null);
 
   const publisher =
     useRef<RtmpPublisherViewMethods | null>(null);
@@ -65,6 +62,26 @@ export default function PremiumLivePlayerScreen({
   const [creating, setCreating] = useState(false);
   const [error, setError] =
     useState<string | null>(null);
+
+  const [showLiveClassDetails, setShowLiveClassDetails] =
+    useState(false);
+
+  // Premium Live onBack handler
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (onBack) {
+          onBack();
+          return true;
+        }
+
+        return false;
+      }
+    );
+
+    return () => subscription.remove();
+  }, [onBack]);
 
   const hybridRef = useMemo(
     () =>
@@ -163,46 +180,6 @@ export default function PremiumLivePlayerScreen({
       ? `${shopName} Premium Live Class`
       : `${teacherName} Premium Live Class`;
 
-  const loadPlayback = async (
-    playbackId: string
-  ) => {
-    try {
-      setError(null);
-
-      const response = await fetch(
-        `${backendUrl}/api/livepeer/playback?playbackId=${encodeURIComponent(
-          playbackId
-        )}`
-      );
-
-      const data = await response.json();
-
-      if (
-        !response.ok ||
-        !data.success ||
-        !data.streamUrl
-      ) {
-        throw new Error(
-          data.message ||
-            'Livepeer playback URL unavailable.'
-        );
-      }
-
-      setStreamUrl(data.streamUrl);
-    } catch (err) {
-      console.error(
-        'Livepeer playback error:',
-        err
-      );
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to load premium live playback.'
-      );
-    }
-  };
-
   const loadStreamStatus = async (
     streamId: string,
     playbackId?: string
@@ -221,6 +198,16 @@ export default function PremiumLivePlayerScreen({
         !data.success ||
         !data.stream
       ) {
+        if (response.status === 401) {
+          console.warn(
+            'Premium Live: saved Livepeer stream is no longer accessible.'
+          );
+
+          setStream(null);
+          setSavedStream(null);
+          return;
+        }
+
         throw new Error(
           data.message ||
             'Unable to load Livepeer stream.'
@@ -232,12 +219,6 @@ export default function PremiumLivePlayerScreen({
       const resolvedPlaybackId =
         data.stream.playbackId ||
         playbackId;
-
-      if (resolvedPlaybackId) {
-        await loadPlayback(
-          resolvedPlaybackId
-        );
-      }
     } catch (err) {
       console.error(
         'Livepeer status error:',
@@ -323,11 +304,6 @@ export default function PremiumLivePlayerScreen({
         ingestUrl: premiumLive.ingestUrl,
         streamKey: premiumLive.streamKey,
       });
-
-      await loadPlayback(
-        premiumLive.playbackId
-      );
-
       await loadStreamStatus(
         premiumLive.streamId,
         premiumLive.playbackId
@@ -425,7 +401,6 @@ export default function PremiumLivePlayerScreen({
     try {
       setLoading(true);
       setError(null);
-      setStreamUrl(null);
 
       const existing =
         await getCoachingPremiumLive(
@@ -471,18 +446,6 @@ export default function PremiumLivePlayerScreen({
   };
 
   useEffect(() => {
-    if (!streamUrl) {
-      player.replace(null);
-      return;
-    }
-
-    player.replace({
-      uri: streamUrl,
-      contentType: 'hls',
-    });
-  }, [streamUrl, player]);
-
-  useEffect(() => {
     initialize();
   }, [firebaseUid, backendUrl]);
 
@@ -491,14 +454,29 @@ export default function PremiumLivePlayerScreen({
       return;
     }
 
-    const interval = setInterval(() => {
-      loadStreamStatus(
+    let active = true;
+
+    const checkStatus = async () => {
+      if (!active) {
+        return;
+      }
+
+      await loadStreamStatus(
         savedStream.streamId,
         savedStream.playbackId
       );
+    };
+
+    checkStatus();
+
+    const interval = setInterval(() => {
+      checkStatus();
     }, 10000);
 
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [savedStream?.streamId]);
 
   return (
@@ -561,7 +539,7 @@ export default function PremiumLivePlayerScreen({
                 STOP LIVE
               </Text>
             </TouchableOpacity>
-          ) : savedStream ? (
+          ) : savedStream?.streamKey ? (
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={startBroadcast}
@@ -577,97 +555,109 @@ export default function PremiumLivePlayerScreen({
                 GO LIVE
               </Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View style={styles.playerContainer}>
-          {loading ? (
-            <View style={styles.emptyPlayer}>
-              <ActivityIndicator
-                size="large"
-                color="#ffffff"
-              />
-
-              <Text style={styles.emptyText}>
-                Loading your live stream...
-              </Text>
-            </View>
-          ) : streamUrl ? (
-            <VideoView
-              player={player}
-              style={styles.video}
-              contentFit="contain"
-              nativeControls
-            />
           ) : (
-            <View style={styles.emptyPlayer}>
-              <Text style={styles.emptyTitle}>
-                Premium Live
-              </Text>
-
-              <Text style={styles.emptyText}>
-                Create your Livepeer stream to begin.
-              </Text>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={createStream}
+              disabled={!permissionsReady || creating}
+              style={[
+                styles.goLiveButton,
+                (!permissionsReady || creating) &&
+                  styles.buttonDisabled,
+              ]}
+            >
+              {creating ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#ffffff"
+                />
+              ) : (
+                <Text style={styles.goLiveButtonText}>
+                  CREATE PREMIUM STREAM
+                </Text>
+              )}
+            </TouchableOpacity>
           )}
         </View>
 
-        {stream ? (
-          <View style={styles.statusCard}>
-            <View
-              style={[
-                styles.statusDot,
-                stream.isActive
-                  ? styles.statusLive
-                  : styles.statusOffline,
-              ]}
-            />
+        <View style={styles.statusCard}>
+          <View
+            style={[
+              styles.statusDot,
+              stream?.isActive
+                ? styles.statusLive
+                : styles.statusOffline,
+            ]}
+          />
 
-            <Text style={styles.statusText}>
-              {stream.isActive
-                ? 'LIVE NOW'
-                : 'OFFLINE'}
-            </Text>
-          </View>
-        ) : null}
+          <Text style={styles.statusText}>
+            {stream?.isActive ? 'ON AIR' : 'OFFLINE'}
+          </Text>
+        </View>
 
         {savedStream ? (
           <View style={styles.infoCard}>
-            <Text style={styles.infoTitle}>
-              Your Live Class
-            </Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                setShowLiveClassDetails(
+                  previous => !previous
+                )
+              }
+              style={styles.infoHeader}
+            >
+              <View>
+                <Text style={styles.infoTitle}>
+                  Your Live Class
+                </Text>
 
-            <Text style={styles.infoLabel}>
-              Stream Name
-            </Text>
+                <Text style={styles.infoSummary}>
+                  {showLiveClassDetails
+                    ? 'Hide stream details'
+                    : 'Show stream details'}
+                </Text>
+              </View>
 
-            <Text style={styles.infoValue}>
-              {savedStream.streamName}
-            </Text>
+              <Text style={styles.dropdownArrow}>
+                {showLiveClassDetails ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
 
-            <Text style={styles.infoLabel}>
-              Stream ID
-            </Text>
+            {showLiveClassDetails ? (
+              <View style={styles.infoDetails}>
+                <Text style={styles.infoLabel}>
+                  Stream Name
+                </Text>
 
-            <Text style={styles.infoValue}>
-              {savedStream.streamId}
-            </Text>
+                <Text style={styles.infoValue}>
+                  {savedStream.streamName}
+                </Text>
 
-            <Text style={styles.infoLabel}>
-              Playback ID
-            </Text>
+                <Text style={styles.infoLabel}>
+                  Stream ID
+                </Text>
 
-            <Text style={styles.infoValue}>
-              {savedStream.playbackId}
-            </Text>
+                <Text style={styles.infoValue}>
+                  {savedStream.streamId}
+                </Text>
 
-            <Text style={styles.infoLabel}>
-              Ingest URL
-            </Text>
+                <Text style={styles.infoLabel}>
+                  Playback ID
+                </Text>
 
-            <Text style={styles.infoValue}>
-              {savedStream.ingestUrl}
-            </Text>
+                <Text style={styles.infoValue}>
+                  {savedStream.playbackId}
+                </Text>
+
+                <Text style={styles.infoLabel}>
+                  Ingest URL
+                </Text>
+
+                <Text style={styles.infoValue}>
+                  {savedStream.ingestUrl}
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -677,58 +667,7 @@ export default function PremiumLivePlayerScreen({
           </Text>
         ) : null}
 
-        {!loading && !savedStream ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={createStream}
-            disabled={creating}
-            style={[
-              styles.primaryButton,
-              creating &&
-                styles.buttonDisabled,
-            ]}
-          >
-            {creating ? (
-              <ActivityIndicator
-                color="#ffffff"
-              />
-            ) : (
-              <Text
-                style={
-                  styles.primaryButtonText
-                }
-              >
-                Create Premium Live Stream
-              </Text>
-            )}
-          </TouchableOpacity>
-        ) : null}
 
-        {savedStream ? (
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() =>
-              loadStreamStatus(
-                savedStream.streamId,
-                savedStream.playbackId
-              )
-            }
-            disabled={loading}
-            style={styles.secondaryButton}
-          >
-            {loading ? (
-              <ActivityIndicator />
-            ) : (
-              <Text
-                style={
-                  styles.secondaryButtonText
-                }
-              >
-                Refresh Live Status
-              </Text>
-            )}
-          </TouchableOpacity>
-        ) : null}
       </ScrollView>
     </View>
   );
@@ -759,7 +698,7 @@ const styles = StyleSheet.create({
   },
 
   publisherContainer: {
-    height: 240,
+    height: 360,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#020617',
@@ -893,6 +832,34 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     marginBottom: 14,
   },
+
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  infoSummary: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  dropdownArrow: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#64748b',
+    marginLeft: 10,
+  },
+
+  infoDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+
 
   infoLabel: {
     marginTop: 10,
