@@ -1,0 +1,1554 @@
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as DocumentPicker from 'expo-document-picker';
+
+import { useApp } from '@/context/AppContext';
+import { uploadMediaToCloudinary } from '@/services/cloudinary';
+import {
+  getRecordedCourses,
+  saveRecordedCourse,
+  type RecordedCourse as FirebaseRecordedCourse,
+  type RecordedCourseMaterial,
+  type RecordedCourseSourceType,
+} from '../coachingTeacherService';
+
+type RecordedClassScreenProps = {
+  onBack?: () => void;
+};
+
+type CourseType = 'free' | 'paid';
+
+type CourseMaterialForm = {
+  id: string;
+  subjectName: string;
+
+  pdfName: string;
+  pdfSourceType: RecordedCourseSourceType;
+  pdfUrl: string;
+
+  lectureName: string;
+  videoSourceType: RecordedCourseSourceType;
+  videoUrl: string;
+
+  pdfUploading: boolean;
+  videoUploading: boolean;
+};
+
+type RecordedCourse = FirebaseRecordedCourse;
+
+const createMaterial = (): CourseMaterialForm => ({
+  id: `${Date.now()}-${Math.random()}`,
+  subjectName: '',
+
+  pdfName: '',
+  pdfSourceType: 'url',
+  pdfUrl: '',
+
+  lectureName: '',
+  videoSourceType: 'url',
+  videoUrl: '',
+
+  pdfUploading: false,
+  videoUploading: false,
+});
+
+export default function RecordedClassScreen({
+  onBack,
+}: RecordedClassScreenProps) {
+  const { firebaseUid } = useApp();
+
+  const [activeTab, setActiveTab] = useState<
+    'add' | 'courses'
+  >('add');
+
+  const [courseName, setCourseName] = useState('');
+  const [courseDetails, setCourseDetails] = useState('');
+  const [courseType, setCourseType] =
+    useState<CourseType>('free');
+
+  const [materials, setMaterials] = useState<
+    CourseMaterialForm[]
+  >([createMaterial()]);
+
+  const [courses, setCourses] = useState<
+    RecordedCourse[]
+  >([]);
+
+  const [saving, setSaving] = useState(false);
+  const [loadingCourses, setLoadingCourses] =
+    useState(false);
+
+  useEffect(() => {
+    if (!firebaseUid) {
+      return;
+    }
+
+    loadCourses();
+  }, [firebaseUid]);
+
+  const loadCourses = async () => {
+    if (!firebaseUid) {
+      return;
+    }
+
+    try {
+      setLoadingCourses(true);
+
+      const loadedCourses =
+        await getRecordedCourses(firebaseUid);
+
+      setCourses(loadedCourses);
+    } catch (error) {
+      console.error(
+        'RECORDED COURSES LOAD ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        'Unable to load recorded courses.'
+      );
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
+  const addMaterial = () => {
+    setMaterials((current) => [
+      ...current,
+      createMaterial(),
+    ]);
+  };
+
+  const removeMaterial = (id: string) => {
+    if (materials.length === 1) {
+      return;
+    }
+
+    setMaterials((current) =>
+      current.filter((item) => item.id !== id)
+    );
+  };
+
+  const updateMaterial = (
+    id: string,
+    field: keyof CourseMaterialForm,
+    value: string | boolean
+  ) => {
+    setMaterials((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const updatePdfSourceType = (
+    id: string,
+    sourceType: RecordedCourseSourceType
+  ) => {
+    setMaterials((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              pdfSourceType: sourceType,
+              pdfUrl:
+                sourceType === 'physical'
+                  ? ''
+                  : item.pdfUrl,
+              pdfName:
+                sourceType === 'physical'
+                  ? ''
+                  : item.pdfName,
+            }
+          : item
+      )
+    );
+  };
+
+  const updateVideoSourceType = (
+    id: string,
+    sourceType: RecordedCourseSourceType
+  ) => {
+    setMaterials((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              videoSourceType: sourceType,
+              videoUrl:
+                sourceType === 'physical'
+                  ? ''
+                  : item.videoUrl,
+            }
+          : item
+      )
+    );
+  };
+
+  const pickPdf = async (
+    materialId: string
+  ) => {
+    try {
+      const result =
+        await DocumentPicker.getDocumentAsync({
+          type: 'application/pdf',
+          copyToCacheDirectory: true,
+          multiple: false,
+        });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets?.[0];
+
+      if (!file?.uri) {
+        throw new Error(
+          'PDF file URI was not returned.'
+        );
+      }
+
+      updateMaterial(
+        materialId,
+        'pdfUploading',
+        true
+      );
+
+      const cloudinaryUrl =
+        await uploadMediaToCloudinary(
+          file.uri,
+          'raw'
+        );
+
+      updateMaterial(
+        materialId,
+        'pdfUrl',
+        cloudinaryUrl
+      );
+
+      updateMaterial(
+        materialId,
+        'pdfName',
+        file.name || 'PDF Document'
+      );
+
+      Alert.alert(
+        'PDF uploaded',
+        'PDF has been uploaded successfully.'
+      );
+    } catch (error: any) {
+      console.error(
+        'RECORDED PDF UPLOAD ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'PDF upload failed',
+        error?.message ||
+          'Unable to upload PDF.'
+      );
+    } finally {
+      updateMaterial(
+        materialId,
+        'pdfUploading',
+        false
+      );
+    }
+  };
+
+  const pickVideo = async (
+    materialId: string
+  ) => {
+    try {
+      const result =
+        await DocumentPicker.getDocumentAsync({
+          type: 'video/*',
+          copyToCacheDirectory: true,
+          multiple: false,
+        });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets?.[0];
+
+      if (!file?.uri) {
+        throw new Error(
+          'Video file URI was not returned.'
+        );
+      }
+
+      updateMaterial(
+        materialId,
+        'videoUploading',
+        true
+      );
+
+      const cloudinaryUrl =
+        await uploadMediaToCloudinary(
+          file.uri,
+          'video'
+        );
+
+      updateMaterial(
+        materialId,
+        'videoUrl',
+        cloudinaryUrl
+      );
+
+      Alert.alert(
+        'Video uploaded',
+        'Video has been uploaded successfully.'
+      );
+    } catch (error: any) {
+      console.error(
+        'RECORDED VIDEO UPLOAD ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Video upload failed',
+        error?.message ||
+          'Unable to upload video.'
+      );
+    } finally {
+      updateMaterial(
+        materialId,
+        'videoUploading',
+        false
+      );
+    }
+  };
+
+  const resetForm = () => {
+    setCourseName('');
+    setCourseDetails('');
+    setCourseType('free');
+    setMaterials([createMaterial()]);
+  };
+
+  const addCourse = async () => {
+    if (!firebaseUid) {
+      Alert.alert(
+        'Login required',
+        'Teacher authentication not found.'
+      );
+      return;
+    }
+
+    if (!courseName.trim()) {
+      Alert.alert(
+        'Course name required',
+        'Please enter the course name.'
+      );
+      return;
+    }
+
+    if (!courseDetails.trim()) {
+      Alert.alert(
+        'Course details required',
+        'Please enter course details.'
+      );
+      return;
+    }
+
+    const incompleteUpload = materials.some(
+      (item) =>
+        item.pdfUploading ||
+        item.videoUploading
+    );
+
+    if (incompleteUpload) {
+      Alert.alert(
+        'Upload in progress',
+        'Please wait until all uploads finish.'
+      );
+      return;
+    }
+
+    const validMaterials =
+      materials.filter(
+        (item) =>
+          item.subjectName.trim() ||
+          item.pdfUrl.trim() ||
+          item.videoUrl.trim() ||
+          item.lectureName.trim()
+      );
+
+    if (validMaterials.length === 0) {
+      Alert.alert(
+        'Course content required',
+        'Please add at least one lecture or material.'
+      );
+      return;
+    }
+
+    for (const item of validMaterials) {
+      if (
+        item.pdfSourceType === 'url' &&
+        item.pdfUrl.trim() &&
+        !/^https?:\/\//i.test(
+          item.pdfUrl.trim()
+        )
+      ) {
+        Alert.alert(
+          'Invalid PDF URL',
+          'Please enter a valid PDF URL beginning with http:// or https://.'
+        );
+        return;
+      }
+
+      if (
+        item.videoSourceType === 'url' &&
+        item.videoUrl.trim() &&
+        !/^https?:\/\//i.test(
+          item.videoUrl.trim()
+        )
+      ) {
+        Alert.alert(
+          'Invalid video URL',
+          'Please enter a valid video URL beginning with http:// or https://.'
+        );
+        return;
+      }
+
+      if (
+        item.pdfSourceType === 'physical' &&
+        !item.pdfUrl.trim()
+      ) {
+        Alert.alert(
+          'PDF required',
+          'Please select and upload the physical PDF.'
+        );
+        return;
+      }
+
+      if (
+        item.videoSourceType === 'physical' &&
+        !item.videoUrl.trim()
+      ) {
+        Alert.alert(
+          'Video required',
+          'Please select and upload the physical video.'
+        );
+        return;
+      }
+    }
+
+    try {
+      setSaving(true);
+
+      const firebaseMaterials:
+        RecordedCourseMaterial[] =
+        validMaterials.map((item) => ({
+          id: item.id,
+          subjectName:
+            item.subjectName.trim(),
+
+          pdfName:
+            item.pdfName.trim(),
+          pdfSourceType:
+            item.pdfSourceType,
+          pdfUrl:
+            item.pdfUrl.trim(),
+
+          lectureName:
+            item.lectureName.trim(),
+          videoSourceType:
+            item.videoSourceType,
+          videoUrl:
+            item.videoUrl.trim(),
+        }));
+
+      await saveRecordedCourse(
+        firebaseUid,
+        {
+          courseName:
+            courseName.trim(),
+          courseDetails:
+            courseDetails.trim(),
+          courseType,
+          materials:
+            firebaseMaterials,
+        }
+      );
+
+      resetForm();
+      await loadCourses();
+      setActiveTab('courses');
+
+      Alert.alert(
+        'Course added',
+        'Recorded course has been saved successfully.'
+      );
+    } catch (error: any) {
+      console.error(
+        'RECORDED COURSE SAVE ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Save failed',
+        error?.message ||
+          'Unable to save recorded course.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
+    >
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.backButton}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color="#0f172a"
+          />
+        </TouchableOpacity>
+
+        <View style={styles.headerText}>
+          <Text style={styles.title}>
+            Recorded Class
+          </Text>
+
+          <Text style={styles.subtitle}>
+            Manage your recorded courses
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveTab('add')}
+          style={[
+            styles.tab,
+            activeTab === 'add' &&
+              styles.activeTab,
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'add' &&
+                styles.activeTabText,
+            ]}
+          >
+            Add Course
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() =>
+            setActiveTab('courses')
+          }
+          style={[
+            styles.tab,
+            activeTab === 'courses' &&
+              styles.activeTab,
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'courses' &&
+                styles.activeTabText,
+            ]}
+          >
+            My Courses
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {activeTab === 'add' ? (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>
+                Course Information
+              </Text>
+
+              <Text style={styles.label}>
+                Course Name
+              </Text>
+
+              <TextInput
+                value={courseName}
+                onChangeText={setCourseName}
+                placeholder="Enter course name"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>
+                Course Details
+              </Text>
+
+              <TextInput
+                value={courseDetails}
+                onChangeText={setCourseDetails}
+                placeholder="Describe this course"
+                placeholderTextColor="#94a3b8"
+                style={[
+                  styles.input,
+                  styles.multilineInput,
+                ]}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <Text style={styles.label}>
+                Course Type
+              </Text>
+
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setCourseType('free')
+                  }
+                  style={[
+                    styles.typeButton,
+                    courseType === 'free' &&
+                      styles.selectedTypeButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      courseType === 'free' &&
+                        styles.selectedTypeText,
+                    ]}
+                  >
+                    FREE
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setCourseType('paid')
+                  }
+                  style={[
+                    styles.typeButton,
+                    courseType === 'paid' &&
+                      styles.selectedTypeButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      courseType === 'paid' &&
+                        styles.selectedTypeText,
+                    ]}
+                  >
+                    PAID
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Course Content
+                </Text>
+
+                <Text style={styles.itemCount}>
+                  {materials.length} item
+                  {materials.length === 1
+                    ? ''
+                    : 's'}
+                </Text>
+              </View>
+
+              {materials.map(
+                (material, index) => (
+                  <View
+                    key={material.id}
+                    style={styles.materialCard}
+                  >
+                    <View
+                      style={styles.materialHeader}
+                    >
+                      <Text
+                        style={
+                          styles.materialTitle
+                        }
+                      >
+                        Lecture / Material{' '}
+                        {index + 1}
+                      </Text>
+
+                      {materials.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            removeMaterial(
+                              material.id
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={20}
+                            color="#dc2626"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    <Text style={styles.label}>
+                      Subject Name
+                    </Text>
+
+                    <TextInput
+                      value={
+                        material.subjectName
+                      }
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'subjectName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Mathematics"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      PDF Name
+                    </Text>
+
+                    <TextInput
+                      value={material.pdfName}
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'pdfName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Algebra Notes"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      PDF Source
+                    </Text>
+
+                    <View style={styles.typeRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updatePdfSourceType(
+                            material.id,
+                            'url'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.pdfSourceType ===
+                            'url' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.pdfSourceType ===
+                              'url' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          URL
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updatePdfSourceType(
+                            material.id,
+                            'physical'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.pdfSourceType ===
+                            'physical' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.pdfSourceType ===
+                              'physical' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          PHYSICAL
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {material.pdfSourceType ===
+                    'url' ? (
+                      <>
+                        <Text style={styles.label}>
+                          PDF URL
+                        </Text>
+
+                        <TextInput
+                          value={
+                            material.pdfUrl
+                          }
+                          onChangeText={(value) =>
+                            updateMaterial(
+                              material.id,
+                              'pdfUrl',
+                              value
+                            )
+                          }
+                          placeholder="Paste PDF URL"
+                          placeholderTextColor="#94a3b8"
+                          autoCapitalize="none"
+                          keyboardType="url"
+                          style={styles.input}
+                        />
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          pickPdf(material.id)
+                        }
+                        disabled={
+                          material.pdfUploading
+                        }
+                        style={[
+                          styles.browseButton,
+                          material.pdfUploading &&
+                            styles.buttonDisabled,
+                        ]}
+                      >
+                        {material.pdfUploading ? (
+                          <ActivityIndicator />
+                        ) : (
+                          <Ionicons
+                            name={
+                              material.pdfUrl
+                                ? 'checkmark-circle-outline'
+                                : 'document-attach-outline'
+                            }
+                            size={21}
+                            color="#2563eb"
+                          />
+                        )}
+
+                        <Text
+                          style={
+                            styles.browseButtonText
+                          }
+                        >
+                          {material.pdfUploading
+                            ? 'Uploading PDF...'
+                            : material.pdfUrl
+                              ? material.pdfName ||
+                                'PDF uploaded'
+                              : 'Browse PDF'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <Text style={styles.label}>
+                      Lecture Name
+                    </Text>
+
+                    <TextInput
+                      value={
+                        material.lectureName
+                      }
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'lectureName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Algebra - Lecture 1"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      Video Source
+                    </Text>
+
+                    <View style={styles.typeRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updateVideoSourceType(
+                            material.id,
+                            'url'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.videoSourceType ===
+                            'url' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.videoSourceType ===
+                              'url' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          URL
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updateVideoSourceType(
+                            material.id,
+                            'physical'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.videoSourceType ===
+                            'physical' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.videoSourceType ===
+                              'physical' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          PHYSICAL
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {material.videoSourceType ===
+                    'url' ? (
+                      <>
+                        <Text style={styles.label}>
+                          Video URL
+                        </Text>
+
+                        <TextInput
+                          value={
+                            material.videoUrl
+                          }
+                          onChangeText={(value) =>
+                            updateMaterial(
+                              material.id,
+                              'videoUrl',
+                              value
+                            )
+                          }
+                          placeholder="YouTube / Telegram / video URL"
+                          placeholderTextColor="#94a3b8"
+                          autoCapitalize="none"
+                          keyboardType="url"
+                          style={styles.input}
+                        />
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          pickVideo(material.id)
+                        }
+                        disabled={
+                          material.videoUploading
+                        }
+                        style={[
+                          styles.browseButton,
+                          material.videoUploading &&
+                            styles.buttonDisabled,
+                        ]}
+                      >
+                        {material.videoUploading ? (
+                          <ActivityIndicator />
+                        ) : (
+                          <Ionicons
+                            name={
+                              material.videoUrl
+                                ? 'checkmark-circle-outline'
+                                : 'videocam-outline'
+                            }
+                            size={21}
+                            color="#2563eb"
+                          />
+                        )}
+
+                        <Text
+                          style={
+                            styles.browseButtonText
+                          }
+                        >
+                          {material.videoUploading
+                            ? 'Uploading Video...'
+                            : material.videoUrl
+                              ? 'Video uploaded'
+                              : 'Browse Video'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
+              )}
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={addMaterial}
+                style={styles.addMoreButton}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={21}
+                  color="#2563eb"
+                />
+
+                <Text
+                  style={styles.addMoreText}
+                >
+                  Add More
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={addCourse}
+              disabled={saving}
+              style={[
+                styles.primaryButton,
+                saving &&
+                  styles.buttonDisabled,
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator
+                  color="#ffffff"
+                />
+              ) : (
+                <>
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={21}
+                    color="#ffffff"
+                  />
+
+                  <Text
+                    style={
+                      styles.primaryButtonText
+                    }
+                  >
+                    Add Course
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {loadingCourses ? (
+              <View style={styles.loadingCard}>
+                <ActivityIndicator />
+
+                <Text
+                  style={styles.loadingText}
+                >
+                  Loading courses...
+                </Text>
+              </View>
+            ) : courses.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons
+                  name="library-outline"
+                  size={48}
+                  color="#94a3b8"
+                />
+
+                <Text
+                  style={styles.emptyTitle}
+                >
+                  Please add a course
+                </Text>
+
+                <Text
+                  style={styles.emptyText}
+                >
+                  Your recorded courses will
+                  appear here.
+                </Text>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setActiveTab('add')
+                  }
+                  style={styles.emptyButton}
+                >
+                  <Text
+                    style={
+                      styles.emptyButtonText
+                    }
+                  >
+                    Add Course
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              courses.map((course) => (
+                <View
+                  key={course.id}
+                  style={styles.courseCard}
+                >
+                  <View
+                    style={styles.courseHeader}
+                  >
+                    <View
+                      style={
+                        styles.courseTitleWrap
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.courseTitle
+                        }
+                      >
+                        {course.courseName}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.courseType
+                        }
+                      >
+                        {course.courseType.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text
+                    style={styles.courseDetails}
+                  >
+                    {course.courseDetails}
+                  </Text>
+
+                  <Text
+                    style={styles.courseCount}
+                  >
+                    {course.materials.length}{' '}
+                    lecture/material
+                    {course.materials.length === 1
+                      ? ''
+                      : 's'}
+                  </Text>
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+
+  header: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+    marginRight: 12,
+  },
+
+  headerText: {
+    flex: 1,
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
+
+  tab: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+
+  activeTab: {
+    borderBottomColor: '#2563eb',
+  },
+
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  activeTabText: {
+    color: '#2563eb',
+  },
+
+  content: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 12,
+  },
+
+  itemCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+
+  input: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+    fontSize: 14,
+  },
+
+  multilineInput: {
+    minHeight: 100,
+    paddingTop: 12,
+  },
+
+  typeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  typeButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  selectedTypeButton: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+
+  typeButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+
+  selectedTypeText: {
+    color: '#2563eb',
+  },
+
+  materialCard: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 12,
+    backgroundColor: '#f8fafc',
+  },
+
+  materialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+
+  materialTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  browseButton: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+
+  browseButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  addMoreButton: {
+    minHeight: 46,
+    marginTop: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+
+  addMoreText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  primaryButton: {
+    minHeight: 52,
+    borderRadius: 12,
+    backgroundColor: '#2563eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 24,
+  },
+
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 28,
+    alignItems: 'center',
+  },
+
+  emptyTitle: {
+    marginTop: 12,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  emptyText: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    color: '#64748b',
+  },
+
+  emptyButton: {
+    marginTop: 18,
+    minHeight: 42,
+    paddingHorizontal: 22,
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  loadingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 30,
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  courseCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 16,
+    marginBottom: 12,
+  },
+
+  courseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  courseTitleWrap: {
+    flex: 1,
+  },
+
+  courseTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  courseType: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  courseDetails: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#475569',
+  },
+
+  courseCount: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+});

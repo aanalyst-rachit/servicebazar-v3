@@ -1,0 +1,1048 @@
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { useApp } from '@/context/AppContext';
+
+type RecordedClassScreenProps = {
+  onBack?: () => void;
+};
+
+type CourseType = 'free' | 'paid';
+
+type MaterialType = 'pdf' | 'video';
+
+type CourseMaterial = {
+  id: string;
+  subjectName: string;
+  pdfName: string;
+  pdfUrl: string;
+  lectureName: string;
+  videoUrl: string;
+  type: MaterialType;
+};
+
+type RecordedCourse = {
+  id: string;
+  courseName: string;
+  courseDetails: string;
+  courseType: CourseType;
+  materials: CourseMaterial[];
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+const createMaterial = (): CourseMaterial => ({
+  id: `${Date.now()}-${Math.random()}`,
+  subjectName: '',
+  pdfName: '',
+  pdfUrl: '',
+  lectureName: '',
+  videoUrl: '',
+  type: 'video',
+});
+
+export default function RecordedClassScreen({
+  onBack,
+}: RecordedClassScreenProps) {
+  const { firebaseUid } = useApp();
+
+  const [activeTab, setActiveTab] = useState<
+    'add' | 'courses'
+  >('add');
+
+  const [courseName, setCourseName] = useState('');
+  const [courseDetails, setCourseDetails] = useState('');
+  const [courseType, setCourseType] =
+    useState<CourseType>('free');
+
+  const [materials, setMaterials] = useState<
+    CourseMaterial[]
+  >([createMaterial()]);
+
+  const [courses, setCourses] = useState<
+    RecordedCourse[]
+  >([]);
+
+  const [saving, setSaving] = useState(false);
+
+  const addMaterial = () => {
+    setMaterials((current) => [
+      ...current,
+      createMaterial(),
+    ]);
+  };
+
+  const removeMaterial = (id: string) => {
+    if (materials.length === 1) {
+      return;
+    }
+
+    setMaterials((current) =>
+      current.filter((item) => item.id !== id)
+    );
+  };
+
+  const updateMaterial = (
+    id: string,
+    field: keyof CourseMaterial,
+    value: string
+  ) => {
+    setMaterials((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]: value,
+            }
+          : item
+      )
+    );
+  };
+
+  const updateMaterialType = (
+    id: string,
+    type: MaterialType
+  ) => {
+    setMaterials((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              type,
+            }
+          : item
+      )
+    );
+  };
+
+  const resetForm = () => {
+    setCourseName('');
+    setCourseDetails('');
+    setCourseType('free');
+    setMaterials([createMaterial()]);
+  };
+
+  const addCourse = async () => {
+    if (!firebaseUid) {
+      Alert.alert(
+        'Login required',
+        'Teacher authentication not found.'
+      );
+      return;
+    }
+
+    if (!courseName.trim()) {
+      Alert.alert(
+        'Course name required',
+        'Please enter the course name.'
+      );
+      return;
+    }
+
+    if (!courseDetails.trim()) {
+      Alert.alert(
+        'Course details required',
+        'Please enter course details.'
+      );
+      return;
+    }
+
+    const validMaterials = materials.filter(
+      (item) =>
+        item.subjectName.trim() ||
+        item.pdfName.trim() ||
+        item.pdfUrl.trim() ||
+        item.lectureName.trim() ||
+        item.videoUrl.trim()
+    );
+
+    if (validMaterials.length === 0) {
+      Alert.alert(
+        'Course content required',
+        'Please add at least one lecture or material.'
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const newCourse: RecordedCourse = {
+        id: `${Date.now()}`,
+        courseName: courseName.trim(),
+        courseDetails: courseDetails.trim(),
+        courseType,
+        materials: validMaterials,
+      };
+
+      /*
+       * Firebase save will be connected in the next step.
+       * For now keep the course locally so the complete UI
+       * flow can be tested safely.
+       */
+      setCourses((current) => [
+        newCourse,
+        ...current,
+      ]);
+
+      resetForm();
+      setActiveTab('courses');
+
+      Alert.alert(
+        'Course added',
+        'Course has been added successfully.'
+      );
+    } catch (error) {
+      console.error(
+        'RECORDED COURSE SAVE ERROR:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        'Unable to add course.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
+    >
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.backButton}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color="#0f172a"
+          />
+        </TouchableOpacity>
+
+        <View style={styles.headerText}>
+          <Text style={styles.title}>
+            Recorded Class
+          </Text>
+          <Text style={styles.subtitle}>
+            Manage your recorded courses
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveTab('add')}
+          style={[
+            styles.tab,
+            activeTab === 'add' &&
+              styles.activeTab,
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'add' &&
+                styles.activeTabText,
+            ]}
+          >
+            Add Course
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveTab('courses')}
+          style={[
+            styles.tab,
+            activeTab === 'courses' &&
+              styles.activeTab,
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'courses' &&
+                styles.activeTabText,
+            ]}
+          >
+            My Courses
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {activeTab === 'add' ? (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>
+                Course Information
+              </Text>
+
+              <Text style={styles.label}>
+                Course Name
+              </Text>
+
+              <TextInput
+                value={courseName}
+                onChangeText={setCourseName}
+                placeholder="Enter course name"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>
+                Course Details
+              </Text>
+
+              <TextInput
+                value={courseDetails}
+                onChangeText={setCourseDetails}
+                placeholder="Describe this course"
+                placeholderTextColor="#94a3b8"
+                style={[
+                  styles.input,
+                  styles.multilineInput,
+                ]}
+                multiline
+                textAlignVertical="top"
+              />
+
+              <Text style={styles.label}>
+                Course Type
+              </Text>
+
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setCourseType('free')
+                  }
+                  style={[
+                    styles.typeButton,
+                    courseType === 'free' &&
+                      styles.selectedTypeButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      courseType === 'free' &&
+                        styles.selectedTypeText,
+                    ]}
+                  >
+                    FREE
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setCourseType('paid')
+                  }
+                  style={[
+                    styles.typeButton,
+                    courseType === 'paid' &&
+                      styles.selectedTypeButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      courseType === 'paid' &&
+                        styles.selectedTypeText,
+                    ]}
+                  >
+                    PAID
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  Course Content
+                </Text>
+
+                <Text style={styles.itemCount}>
+                  {materials.length} item
+                  {materials.length === 1
+                    ? ''
+                    : 's'}
+                </Text>
+              </View>
+
+              {materials.map(
+                (material, index) => (
+                  <View
+                    key={material.id}
+                    style={styles.materialCard}
+                  >
+                    <View
+                      style={styles.materialHeader}
+                    >
+                      <Text
+                        style={styles.materialTitle}
+                      >
+                        Lecture / Material {index + 1}
+                      </Text>
+
+                      {materials.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() =>
+                            removeMaterial(
+                              material.id
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={20}
+                            color="#dc2626"
+                          />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    <Text style={styles.label}>
+                      Subject Name
+                    </Text>
+
+                    <TextInput
+                      value={
+                        material.subjectName
+                      }
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'subjectName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Mathematics"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      PDF Name
+                    </Text>
+
+                    <TextInput
+                      value={material.pdfName}
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'pdfName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Algebra Notes"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      PDF URL
+                    </Text>
+
+                    <TextInput
+                      value={material.pdfUrl}
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'pdfUrl',
+                          value
+                        )
+                      }
+                      placeholder="Paste PDF URL"
+                      placeholderTextColor="#94a3b8"
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      Lecture Name
+                    </Text>
+
+                    <TextInput
+                      value={
+                        material.lectureName
+                      }
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'lectureName',
+                          value
+                        )
+                      }
+                      placeholder="e.g. Algebra - Lecture 1"
+                      placeholderTextColor="#94a3b8"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      Video URL
+                    </Text>
+
+                    <TextInput
+                      value={material.videoUrl}
+                      onChangeText={(value) =>
+                        updateMaterial(
+                          material.id,
+                          'videoUrl',
+                          value
+                        )
+                      }
+                      placeholder="YouTube / Telegram / Cloudinary URL"
+                      placeholderTextColor="#94a3b8"
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+
+                    <Text style={styles.label}>
+                      Content Type
+                    </Text>
+
+                    <View
+                      style={styles.typeRow}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updateMaterialType(
+                            material.id,
+                            'pdf'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.type ===
+                            'pdf' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.type ===
+                              'pdf' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          PDF
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          updateMaterialType(
+                            material.id,
+                            'video'
+                          )
+                        }
+                        style={[
+                          styles.typeButton,
+                          material.type ===
+                            'video' &&
+                            styles.selectedTypeButton,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.typeButtonText,
+                            material.type ===
+                              'video' &&
+                              styles.selectedTypeText,
+                          ]}
+                        >
+                          VIDEO
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )
+              )}
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={addMaterial}
+                style={styles.addMoreButton}
+              >
+                <Ionicons
+                  name="add-circle-outline"
+                  size={21}
+                  color="#2563eb"
+                />
+                <Text
+                  style={styles.addMoreText}
+                >
+                  Add More
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={addCourse}
+              disabled={saving}
+              style={[
+                styles.primaryButton,
+                saving &&
+                  styles.buttonDisabled,
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator
+                  color="#ffffff"
+                />
+              ) : (
+                <>
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={21}
+                    color="#ffffff"
+                  />
+                  <Text
+                    style={
+                      styles.primaryButtonText
+                    }
+                  >
+                    Add Course
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {courses.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons
+                  name="library-outline"
+                  size={48}
+                  color="#94a3b8"
+                />
+
+                <Text
+                  style={styles.emptyTitle}
+                >
+                  Please add a course
+                </Text>
+
+                <Text
+                  style={styles.emptyText}
+                >
+                  Your recorded courses will
+                  appear here.
+                </Text>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    setActiveTab('add')
+                  }
+                  style={styles.emptyButton}
+                >
+                  <Text
+                    style={
+                      styles.emptyButtonText
+                    }
+                  >
+                    Add Course
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              courses.map((course) => (
+                <View
+                  key={course.id}
+                  style={styles.courseCard}
+                >
+                  <View
+                    style={styles.courseHeader}
+                  >
+                    <View
+                      style={
+                        styles.courseTitleWrap
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.courseTitle
+                        }
+                      >
+                        {course.courseName}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.courseType
+                        }
+                      >
+                        {course.courseType
+                          .toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text
+                    style={styles.courseDetails}
+                  >
+                    {course.courseDetails}
+                  </Text>
+
+                  <Text
+                    style={styles.courseCount}
+                  >
+                    {course.materials.length}{' '}
+                    lecture/material
+                    {course.materials.length ===
+                    1
+                      ? ''
+                      : 's'}
+                  </Text>
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+
+  header: {
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+    marginRight: 12,
+  },
+
+  headerText: {
+    flex: 1,
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  subtitle: {
+    marginTop: 3,
+    fontSize: 13,
+    color: '#64748b',
+  },
+
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 18,
+    paddingBottom: 10,
+  },
+
+  tab: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+
+  activeTab: {
+    borderBottomColor: '#2563eb',
+  },
+
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  activeTabText: {
+    color: '#2563eb',
+  },
+
+  content: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 12,
+  },
+
+  itemCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+
+  input: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    color: '#0f172a',
+    backgroundColor: '#ffffff',
+    fontSize: 14,
+  },
+
+  multilineInput: {
+    minHeight: 100,
+    paddingTop: 12,
+  },
+
+  typeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  typeButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  selectedTypeButton: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+
+  typeButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+
+  selectedTypeText: {
+    color: '#2563eb',
+  },
+
+  materialCard: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 13,
+    marginTop: 10,
+    backgroundColor: '#f8fafc',
+  },
+
+  materialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  materialTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  addMoreButton: {
+    minHeight: 46,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  addMoreText: {
+    marginLeft: 7,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  primaryButton: {
+    minHeight: 54,
+    borderRadius: 14,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+
+  primaryButtonText: {
+    marginLeft: 8,
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  emptyTitle: {
+    marginTop: 14,
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  emptyText: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: '#64748b',
+    fontSize: 13,
+  },
+
+  emptyButton: {
+    marginTop: 18,
+    paddingHorizontal: 22,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  emptyButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  courseCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  courseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+
+  courseTitleWrap: {
+    flex: 1,
+  },
+
+  courseTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  courseType: {
+    marginTop: 5,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+
+  courseDetails: {
+    marginTop: 10,
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  courseCount: {
+    marginTop: 12,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+});

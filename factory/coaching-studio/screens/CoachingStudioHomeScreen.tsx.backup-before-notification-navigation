@@ -15,8 +15,6 @@ import CoachingTeacherRegistrationScreen from './CoachingTeacherRegistrationScre
 import PremiumLivePlayerScreen from './PremiumLivePlayerScreen';
 import RecordedClassScreen from './RecordedClassScreen';
 import StudyMaterialScreen from './StudyMaterialScreen';
-import NotificationScreen from './NotificationScreen';
-import OthersScreen from './OthersScreen';
 
 type MenuItem = {
   id: string;
@@ -81,7 +79,7 @@ export default function CoachingStudioHomeScreen() {
   const coachingName = shopName || 'Coaching Studio';
 
   const [activeScreen, setActiveScreen] = React.useState<
-    'home' | 'profile' | 'live-class' | 'premium-live' | 'recorded-class' | 'study-material' | 'notifications' | 'others'
+    'home' | 'profile' | 'live-class' | 'premium-live' | 'recorded-class' | 'study-material'
   >('home');
 
   React.useEffect(() => {
@@ -91,9 +89,7 @@ export default function CoachingStudioHomeScreen() {
         activeScreen === 'live-class' ||
         activeScreen === 'premium-live' ||
         activeScreen === 'recorded-class' ||
-        activeScreen === 'study-material' ||
-        activeScreen === 'notifications' ||
-        activeScreen === 'others'
+        activeScreen === 'study-material'
       ) {
         setActiveScreen('home');
         return true;
@@ -133,16 +129,6 @@ export default function CoachingStudioHomeScreen() {
 
     if (item.id === 'study-material') {
       setActiveScreen('study-material');
-      return;
-    }
-
-    if (item.id === 'notifications') {
-      setActiveScreen('notifications');
-      return;
-    }
-
-    if (item.id === 'others') {
-      setActiveScreen('others');
       return;
     }
 
@@ -186,22 +172,6 @@ export default function CoachingStudioHomeScreen() {
   if (activeScreen === 'study-material') {
     return (
       <StudyMaterialScreen
-        onBack={() => setActiveScreen('home')}
-      />
-    );
-  }
-
-  if (activeScreen === 'notifications') {
-    return (
-      <NotificationScreen
-        onBack={() => setActiveScreen('home')}
-      />
-    );
-  }
-
-  if (activeScreen === 'others') {
-    return (
-      <OthersScreen
         onBack={() => setActiveScreen('home')}
       />
     );
