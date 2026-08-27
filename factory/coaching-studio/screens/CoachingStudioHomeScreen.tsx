@@ -141,7 +141,7 @@ export default function CoachingStudioHomeScreen() {
   if (activeScreen === 'premium-live') {
     return (
       <PremiumLivePlayerScreen
-        backendUrl="http://192.168.29.57:3000"
+        backendUrl="https://servicebazar-coaching-live.onrender.com"
       />
     );
   }
