@@ -35,6 +35,8 @@ const server = http.createServer((req, res) => {
       'yt-dlp',
       [
         '--no-playlist',
+        '--extractor-args',
+        'youtube:player_client=tv,web_safari',
         '-f',
         'bestvideo[protocol*=m3u8]/best[protocol*=m3u8]',
         '-g',

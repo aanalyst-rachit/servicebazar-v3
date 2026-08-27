@@ -142,7 +142,7 @@ export default function CoachingStudioHomeScreen() {
     return (
       <PremiumLivePlayerScreen
         youtubeUrl="https://www.youtube.com/watch?v=Gt7654q5OVA"
-        backendUrl="http://YOUR_PC_LAN_IP:3000"
+        backendUrl="https://servicebazar-premium-live.onrender.com"
       />
     );
   }

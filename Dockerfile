@@ -6,7 +6,14 @@ RUN apt-get update \
        python3 \
        python3-pip \
        ca-certificates \
+       curl \
+       unzip \
     && pip3 install --no-cache-dir --break-system-packages yt-dlp \
+    && curl -fsSL https://deno.land/install.sh | sh \
+    && ln -s /root/.deno/bin/deno /usr/local/bin/deno \
+    && yt-dlp --update-to nightly \
+    && yt-dlp --version \
+    && deno --version \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
