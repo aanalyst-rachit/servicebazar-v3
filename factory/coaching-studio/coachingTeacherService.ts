@@ -69,3 +69,104 @@ export async function getCoachingTeacherProfile(
     serviceBazarUid,
   };
 }
+
+// ==========================================================
+// COACHING PREMIUM LIVE / LIVEPEER
+// ==========================================================
+
+export type CoachingPremiumLiveStream = {
+  streamId: string;
+  streamKey: string;
+  playbackId: string;
+  ingestUrl: string;
+  streamName: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+export async function saveCoachingPremiumLive(
+  serviceBazarUid: string,
+  stream: CoachingPremiumLiveStream
+): Promise<void> {
+  if (!serviceBazarUid) {
+    throw new Error(
+      'ServiceBazar user ID is required.'
+    );
+  }
+
+  if (!stream.streamId || !stream.playbackId) {
+    throw new Error(
+      'Livepeer stream ID and playback ID are required.'
+    );
+  }
+
+  const profileRef = doc(
+    db,
+    COLLECTION_NAME,
+    serviceBazarUid
+  );
+
+  await setDoc(
+    profileRef,
+    {
+      premiumLive: {
+        streamId: stream.streamId,
+        streamKey: stream.streamKey,
+        playbackId: stream.playbackId,
+        ingestUrl: stream.ingestUrl,
+        streamName: stream.streamName,
+        updatedAt: serverTimestamp(),
+        createdAt:
+          stream.createdAt || serverTimestamp(),
+      },
+    },
+    {
+      merge: true,
+    }
+  );
+}
+
+export async function getCoachingPremiumLive(
+  serviceBazarUid: string
+): Promise<CoachingPremiumLiveStream | null> {
+  if (!serviceBazarUid) {
+    return null;
+  }
+
+  const profileRef = doc(
+    db,
+    COLLECTION_NAME,
+    serviceBazarUid
+  );
+
+  const snapshot = await getDoc(profileRef);
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  const data = snapshot.data();
+  const premiumLive = data?.premiumLive;
+
+  if (
+    !premiumLive?.streamId ||
+    !premiumLive?.playbackId
+  ) {
+    return null;
+  }
+
+  return {
+    streamId: premiumLive.streamId,
+    streamKey: premiumLive.streamKey || '',
+    playbackId: premiumLive.playbackId,
+    ingestUrl:
+      premiumLive.ingestUrl ||
+      'rtmp://rtmp.livepeer.com/live',
+    streamName:
+      premiumLive.streamName ||
+      'ServiceBazar Premium Live Class',
+    createdAt: premiumLive.createdAt,
+    updatedAt: premiumLive.updatedAt,
+  };
+}
+

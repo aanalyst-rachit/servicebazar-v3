@@ -141,8 +141,7 @@ export default function CoachingStudioHomeScreen() {
   if (activeScreen === 'premium-live') {
     return (
       <PremiumLivePlayerScreen
-        youtubeUrl="https://www.youtube.com/watch?v=Gt7654q5OVA"
-        backendUrl="https://servicebazar-premium-live.onrender.com"
+        backendUrl="http://192.168.29.57:3000"
       />
     );
   }

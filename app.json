@@ -38,9 +38,9 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-video",
+      "react-native-nitro-rtmp-publisher",
       "expo-sharing",
-      "@react-native-google-signin/google-signin",
-      "react-native-video"
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

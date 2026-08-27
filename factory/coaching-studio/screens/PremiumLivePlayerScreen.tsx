@@ -1,116 +1,735 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import {
   ActivityIndicator,
+  Alert,
+  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import Video from 'react-native-video';
+
+import { useApp } from '@/context/AppContext';
+import { callback } from 'react-native-nitro-modules';
+import {
+  RtmpPublisherView,
+  requestRtmpPermissions,
+  type RtmpPublisherViewMethods,
+} from 'react-native-nitro-rtmp-publisher';
+import {
+  getCoachingPremiumLive,
+  saveCoachingPremiumLive,
+  type CoachingPremiumLiveStream,
+} from '../coachingTeacherService';
 
 type Props = {
-  youtubeUrl: string;
   backendUrl: string;
 };
 
+type StreamData = {
+  id: string | null;
+  name: string | null;
+  isActive: boolean;
+  playbackId: string | null;
+  ingestUrl: string | null;
+  streamKey: string | null;
+};
+
 export default function PremiumLivePlayerScreen({
-  youtubeUrl,
   backendUrl,
 }: Props) {
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const { firebaseUid, ownerName, shopName } = useApp();
+
+  const [savedStream, setSavedStream] =
+    useState<CoachingPremiumLiveStream | null>(null);
+
+  const [stream, setStream] =
+    useState<StreamData | null>(null);
+
+  const [streamUrl, setStreamUrl] =
+    useState<string | null>(null);
+
+  const player = useVideoPlayer(null);
+
+  const publisher =
+    useRef<RtmpPublisherViewMethods | null>(null);
+
+  const [permissionsReady, setPermissionsReady] =
+    useState(false);
+
+  const [isBroadcasting, setIsBroadcasting] =
+    useState(false);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] =
+    useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const hybridRef = useMemo(
+    () =>
+      callback((ref: RtmpPublisherViewMethods) => {
+        publisher.current = ref;
 
-    const loadStream = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setStreamUrl(null);
+        try {
+          const rotation = ref.getCameraOrientation();
 
-        const endpoint =
-          `${backendUrl}/api/premium-live/stream?url=` +
-          encodeURIComponent(youtubeUrl);
+          ref.prepareVideo(
+            1280,
+            720,
+            30,
+            2_500_000,
+            2,
+            rotation
+          );
 
-        const response = await fetch(endpoint);
+          ref.prepareAudio(
+            128_000,
+            44_100,
+            true
+          );
 
-        if (!response.ok) {
-          throw new Error(`Backend returned ${response.status}`);
-        }
+          ref.startPreview(
+            'back',
+            1280,
+            720
+          );
 
-        const data = await response.json();
+          ref.setAutoReconnect(5, 3000);
 
-        if (!data.success || !data.streamUrl) {
-          throw new Error(
-            data.message || 'Live stream URL not available'
+          ref.setOnConnectionEvent(
+            (event, message) => {
+              console.log(
+                'Premium RTMP:',
+                event,
+                message
+              );
+
+              if (event === 'connectionSuccess') {
+                setIsBroadcasting(true);
+              }
+
+              if (
+                event === 'disconnect' ||
+                event === 'connectionFailed'
+              ) {
+                setIsBroadcasting(false);
+              }
+            }
+          );
+        } catch (err) {
+          console.error(
+            'RTMP publisher setup error:',
+            err
           );
         }
+      }),
+    []
+  );
 
-        if (!cancelled) {
-          setStreamUrl(data.streamUrl);
-        }
-      } catch (err) {
-        console.error('Premium Live stream error:', err);
+  useEffect(() => {
+    let mounted = true;
 
-        if (!cancelled) {
-          setError('Unable to load the premium live stream.');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
+    requestRtmpPermissions()
+      .then(({ granted }) => {
+        if (!mounted) return;
 
-    loadStream();
+        setPermissionsReady(granted);
+
+        if (!granted) {
+          Alert.alert(
+            'Permissions required',
+            'Camera and microphone permissions are required for Premium Live broadcasting.'
+          );
+        }
+      })
+      .catch((err) => {
+        console.error(
+          'RTMP permission error:',
+          err
+        );
+      });
 
     return () => {
-      cancelled = true;
+      mounted = false;
     };
-  }, [youtubeUrl, backendUrl]);
+  }, []);
+
+  const teacherName =
+    ownerName || 'Teacher';
+
+  const streamName =
+    shopName
+      ? `${shopName} Premium Live Class`
+      : `${teacherName} Premium Live Class`;
+
+  const loadPlayback = async (
+    playbackId: string
+  ) => {
+    try {
+      setError(null);
+
+      const response = await fetch(
+        `${backendUrl}/api/livepeer/playback?playbackId=${encodeURIComponent(
+          playbackId
+        )}`
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.streamUrl
+      ) {
+        throw new Error(
+          data.message ||
+            'Livepeer playback URL unavailable.'
+        );
+      }
+
+      setStreamUrl(data.streamUrl);
+    } catch (err) {
+      console.error(
+        'Livepeer playback error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load premium live playback.'
+      );
+    }
+  };
+
+  const loadStreamStatus = async (
+    streamId: string,
+    playbackId?: string
+  ) => {
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/livepeer/stream/${encodeURIComponent(
+          streamId
+        )}`
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.stream
+      ) {
+        throw new Error(
+          data.message ||
+            'Unable to load Livepeer stream.'
+        );
+      }
+
+      setStream(data.stream);
+
+      const resolvedPlaybackId =
+        data.stream.playbackId ||
+        playbackId;
+
+      if (resolvedPlaybackId) {
+        await loadPlayback(
+          resolvedPlaybackId
+        );
+      }
+    } catch (err) {
+      console.error(
+        'Livepeer status error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load live stream status.'
+      );
+    }
+  };
+
+  const createStream = async () => {
+    if (!firebaseUid) {
+      setError(
+        'Teacher authentication not found. Please login again.'
+      );
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setError(null);
+
+      const response = await fetch(
+        `${backendUrl}/api/livepeer/create-stream?name=${encodeURIComponent(
+          streamName
+        )}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.stream
+      ) {
+        throw new Error(
+          data.message ||
+            'Unable to create Livepeer stream.'
+        );
+      }
+
+      const created = data.stream;
+
+      if (
+        !created.id ||
+        !created.playbackId
+      ) {
+        throw new Error(
+          'Livepeer did not return a valid stream.'
+        );
+      }
+
+      const premiumLive: CoachingPremiumLiveStream = {
+        streamId: created.id,
+        streamKey: created.streamKey || '',
+        playbackId: created.playbackId,
+        ingestUrl:
+          created.ingestUrl ||
+          'rtmp://rtmp.livepeer.com/live',
+        streamName:
+          created.name || streamName,
+      };
+
+      await saveCoachingPremiumLive(
+        firebaseUid,
+        premiumLive
+      );
+
+      setSavedStream(premiumLive);
+
+      setStream({
+        id: premiumLive.streamId,
+        name: premiumLive.streamName,
+        isActive: false,
+        playbackId: premiumLive.playbackId,
+        ingestUrl: premiumLive.ingestUrl,
+        streamKey: premiumLive.streamKey,
+      });
+
+      await loadPlayback(
+        premiumLive.playbackId
+      );
+
+      await loadStreamStatus(
+        premiumLive.streamId,
+        premiumLive.playbackId
+      );
+    } catch (err) {
+      console.error(
+        'Livepeer create stream error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to create premium live stream.'
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const startBroadcast = () => {
+    if (!permissionsReady) {
+      Alert.alert(
+        'Permissions required',
+        'Please allow camera and microphone permissions first.'
+      );
+      return;
+    }
+
+    if (!savedStream?.streamKey) {
+      setError(
+        'This Premium Live stream has no stream key. Create a new stream.'
+      );
+      return;
+    }
+
+    if (!savedStream.ingestUrl) {
+      setError(
+        'Livepeer ingest URL is unavailable.'
+      );
+      return;
+    }
+
+    try {
+      setError(null);
+
+      const ingestUrl =
+        savedStream.ingestUrl.replace(/\/$/, '');
+
+      const rtmpUrl =
+        `${ingestUrl}/${savedStream.streamKey}`;
+
+      console.log(
+        'Starting Premium Live RTMP broadcast'
+      );
+
+      publisher.current?.startStream(rtmpUrl);
+    } catch (err) {
+      console.error(
+        'Premium RTMP start error:',
+        err
+      );
+
+      setIsBroadcasting(false);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to start Premium Live broadcast.'
+      );
+    }
+  };
+
+  const stopBroadcast = () => {
+    try {
+      publisher.current?.stopStream();
+      setIsBroadcasting(false);
+    } catch (err) {
+      console.error(
+        'Premium RTMP stop error:',
+        err
+      );
+    }
+  };
+
+  const initialize = async () => {
+    if (!firebaseUid) {
+      setError(
+        'Teacher authentication not found. Please login again.'
+      );
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setStreamUrl(null);
+
+      const existing =
+        await getCoachingPremiumLive(
+          firebaseUid
+        );
+
+      if (existing) {
+        setSavedStream(existing);
+
+        setStream({
+          id: existing.streamId,
+          name: existing.streamName,
+          isActive: false,
+          playbackId: existing.playbackId,
+          ingestUrl: existing.ingestUrl,
+          streamKey: existing.streamKey,
+        });
+
+        await loadStreamStatus(
+          existing.streamId,
+          existing.playbackId
+        );
+
+        return;
+      }
+
+      setSavedStream(null);
+      setStream(null);
+    } catch (err) {
+      console.error(
+        'Premium Live initialization error:',
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to initialize premium live.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!streamUrl) {
+      player.replace(null);
+      return;
+    }
+
+    player.replace({
+      uri: streamUrl,
+      contentType: 'hls',
+    });
+  }, [streamUrl, player]);
+
+  useEffect(() => {
+    initialize();
+  }, [firebaseUid, backendUrl]);
+
+  useEffect(() => {
+    if (!savedStream?.streamId) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      loadStreamStatus(
+        savedStream.streamId,
+        savedStream.playbackId
+      );
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [savedStream?.streamId]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.playerContainer}>
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" />
-            <Text style={styles.text}>
-              Loading live stream...
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>
+          Premium Live Class
+        </Text>
+
+        <Text style={styles.subtitle}>
+          Host your premium coaching class using Livepeer.
+        </Text>
+
+        <View style={styles.publisherContainer}>
+          {permissionsReady ? (
+            <RtmpPublisherView
+              style={styles.publisher}
+              videoCodec="h264"
+              audioCodec="aac"
+              aspectRatioMode="adjust"
+              mirrorPreview={false}
+              mirrorStream={false}
+              thermalWarningThreshold="severe"
+              forceHardwareCodec={false}
+              foregroundServiceIcon=""
+              pictureInPictureEnabled={false}
+              audioSource="camcorder"
+              noiseSuppression={false}
+              autoRotateStream={true}
+              streamMode="balanced"
+              foregroundServiceTitle="ServiceBazar Premium Live"
+              foregroundServiceText="Premium coaching class is live"
+              hybridRef={hybridRef}
+            />
+          ) : (
+            <View style={styles.emptyPlayer}>
+              <ActivityIndicator
+                size="large"
+                color="#ffffff"
+              />
+              <Text style={styles.emptyText}>
+                Preparing camera and microphone...
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.broadcastControls}>
+          {isBroadcasting ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={stopBroadcast}
+              style={styles.stopButton}
+            >
+              <View style={styles.liveDot} />
+              <Text style={styles.stopButtonText}>
+                STOP LIVE
+              </Text>
+            </TouchableOpacity>
+          ) : savedStream ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={startBroadcast}
+              disabled={!permissionsReady}
+              style={[
+                styles.goLiveButton,
+                !permissionsReady &&
+                  styles.buttonDisabled,
+              ]}
+            >
+              <View style={styles.liveDot} />
+              <Text style={styles.goLiveButtonText}>
+                GO LIVE
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.playerContainer}>
+          {loading ? (
+            <View style={styles.emptyPlayer}>
+              <ActivityIndicator
+                size="large"
+                color="#ffffff"
+              />
+
+              <Text style={styles.emptyText}>
+                Loading your live stream...
+              </Text>
+            </View>
+          ) : streamUrl ? (
+            <VideoView
+              player={player}
+              style={styles.video}
+              contentFit="contain"
+              nativeControls
+            />
+          ) : (
+            <View style={styles.emptyPlayer}>
+              <Text style={styles.emptyTitle}>
+                Premium Live
+              </Text>
+
+              <Text style={styles.emptyText}>
+                Create your Livepeer stream to begin.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {stream ? (
+          <View style={styles.statusCard}>
+            <View
+              style={[
+                styles.statusDot,
+                stream.isActive
+                  ? styles.statusLive
+                  : styles.statusOffline,
+              ]}
+            />
+
+            <Text style={styles.statusText}>
+              {stream.isActive
+                ? 'LIVE NOW'
+                : 'OFFLINE'}
             </Text>
           </View>
-        ) : error ? (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : streamUrl ? (
-          <Video
-            source={{
-              uri: streamUrl,
-              type: 'm3u8',
-            }}
-            style={styles.video}
-            controls
-            resizeMode="contain"
-            playInBackground={false}
-            playWhenInactive={false}
-            onError={(event) => {
-              console.error(
-                'Premium Live playback error:',
-                event
-              );
-              setError('Unable to play the live stream.');
-            }}
-          />
-        ) : (
-          <View style={styles.center}>
-            <Text style={styles.errorText}>
-              Stream URL not available.
+        ) : null}
+
+        {savedStream ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>
+              Your Live Class
+            </Text>
+
+            <Text style={styles.infoLabel}>
+              Stream Name
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {savedStream.streamName}
+            </Text>
+
+            <Text style={styles.infoLabel}>
+              Stream ID
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {savedStream.streamId}
+            </Text>
+
+            <Text style={styles.infoLabel}>
+              Playback ID
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {savedStream.playbackId}
+            </Text>
+
+            <Text style={styles.infoLabel}>
+              Ingest URL
+            </Text>
+
+            <Text style={styles.infoValue}>
+              {savedStream.ingestUrl}
             </Text>
           </View>
-        )}
-      </View>
+        ) : null}
+
+        {error ? (
+          <Text style={styles.errorText}>
+            {error}
+          </Text>
+        ) : null}
+
+        {!loading && !savedStream ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={createStream}
+            disabled={creating}
+            style={[
+              styles.primaryButton,
+              creating &&
+                styles.buttonDisabled,
+            ]}
+          >
+            {creating ? (
+              <ActivityIndicator
+                color="#ffffff"
+              />
+            ) : (
+              <Text
+                style={
+                  styles.primaryButtonText
+                }
+              >
+                Create Premium Live Stream
+              </Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
+
+        {savedStream ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() =>
+              loadStreamStatus(
+                savedStream.streamId,
+                savedStream.playbackId
+              )
+            }
+            disabled={loading}
+            style={styles.secondaryButton}
+          >
+            {loading ? (
+              <ActivityIndicator />
+            ) : (
+              <Text
+                style={
+                  styles.secondaryButtonText
+                }
+              >
+                Refresh Live Status
+              </Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -118,29 +737,218 @@ export default function PremiumLivePlayerScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#f8fafc',
   },
+
+  content: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  subtitle: {
+    marginTop: 5,
+    marginBottom: 18,
+    color: '#64748b',
+    fontSize: 14,
+  },
+
+  publisherContainer: {
+    height: 240,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#020617',
+    marginBottom: 12,
+  },
+
+  publisher: {
+    flex: 1,
+  },
+
+  broadcastControls: {
+    marginBottom: 16,
+  },
+
+  goLiveButton: {
+    minHeight: 54,
+    borderRadius: 14,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+
+  goLiveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+
+  stopButton: {
+    minHeight: 54,
+    borderRadius: 14,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+
+  stopButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#ef4444',
+  },
+
   playerContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
+    borderRadius: 14,
+    overflow: 'hidden',
   },
+
   video: {
     width: '100%',
     height: '100%',
   },
-  center: {
+
+  emptyPlayer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
-  text: {
-    marginTop: 10,
-    color: '#fff',
+
+  emptyTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  errorText: {
-    color: '#fff',
+
+  emptyText: {
+    marginTop: 10,
+    color: '#cbd5e1',
     textAlign: 'center',
+    fontSize: 14,
+  },
+
+  statusCard: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  statusDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    marginRight: 9,
+  },
+
+  statusLive: {
+    backgroundColor: '#16a34a',
+  },
+
+  statusOffline: {
+    backgroundColor: '#94a3b8',
+  },
+
+  statusText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+
+  infoCard: {
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 14,
+  },
+
+  infoLabel: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  infoValue: {
+    marginTop: 3,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+
+  errorText: {
+    marginTop: 14,
+    color: '#dc2626',
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  primaryButton: {
+    marginTop: 18,
+    minHeight: 52,
+    borderRadius: 13,
+    backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+
+  secondaryButton: {
+    marginTop: 14,
+    minHeight: 50,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+
+  secondaryButtonText: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
