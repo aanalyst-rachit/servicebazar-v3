@@ -36,7 +36,7 @@ const server = http.createServer((req, res) => {
       [
         '--no-playlist',
         '--extractor-args',
-        'youtube:player_client=tv,web_safari',
+        'youtube:player_client=android',
         '-f',
         'bestvideo[protocol*=m3u8]/best[protocol*=m3u8]',
         '-g',
