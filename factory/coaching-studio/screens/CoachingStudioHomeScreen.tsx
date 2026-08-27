@@ -12,6 +12,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useApp } from '@/context/AppContext';
 import CoachingLiveClassScreen from './CoachingLiveClassScreen';
 import CoachingTeacherRegistrationScreen from './CoachingTeacherRegistrationScreen';
+import PremiumLivePlayerScreen from './PremiumLivePlayerScreen';
 
 type MenuItem = {
   id: string;
@@ -32,6 +33,12 @@ const MENU_ITEMS: MenuItem[] = [
     title: 'Live Class',
     subtitle: 'Start and manage live classes',
     icon: 'videocam-outline',
+  },
+  {
+    id: 'premium-live',
+    title: 'Premium Live Class',
+    subtitle: 'Premium live streaming experience',
+    icon: 'play-forward-circle-outline',
   },
   {
     id: 'recorded-class',
@@ -70,12 +77,16 @@ export default function CoachingStudioHomeScreen() {
   const coachingName = shopName || 'Coaching Studio';
 
   const [activeScreen, setActiveScreen] = React.useState<
-    'home' | 'profile' | 'live-class'
+    'home' | 'profile' | 'live-class' | 'premium-live'
   >('home');
 
   React.useEffect(() => {
     const handleBackPress = () => {
-      if (activeScreen === 'profile' || activeScreen === 'live-class') {
+      if (
+        activeScreen === 'profile' ||
+        activeScreen === 'live-class' ||
+        activeScreen === 'premium-live'
+      ) {
         setActiveScreen('home');
         return true;
       }
@@ -102,6 +113,11 @@ export default function CoachingStudioHomeScreen() {
       return;
     }
 
+    if (item.id === 'premium-live') {
+      setActiveScreen('premium-live');
+      return;
+    }
+
     console.log(
       'COACHING STUDIO MENU:',
       item.id
@@ -119,6 +135,15 @@ export default function CoachingStudioHomeScreen() {
   if (activeScreen === 'live-class') {
     return (
       <CoachingLiveClassScreen />
+    );
+  }
+
+  if (activeScreen === 'premium-live') {
+    return (
+      <PremiumLivePlayerScreen
+        youtubeUrl="https://www.youtube.com/watch?v=Gt7654q5OVA"
+        backendUrl="http://YOUR_PC_LAN_IP:3000"
+      />
     );
   }
 

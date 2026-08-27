@@ -118,6 +118,11 @@ export default function CoachingLiveClassScreen() {
             height={220}
             play
             videoId={videoId}
+            initialPlayerParams={{
+              controls: true,
+              modestbranding: true,
+              rel: false,
+            }}
           />
         ) : (
           <View style={styles.emptyPlayer}>
